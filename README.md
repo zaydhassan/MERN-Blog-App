@@ -76,14 +76,15 @@ git clone
 cd client
 npm install
 
-# Install server-side packages
+Install server-side packages
 cd server
 npm install
 3. Run the App
-# Start frontend
+
+Start frontend
 cd client
 npm start
 
-# Start backend
+Start backend
 cd server
 npm run server
