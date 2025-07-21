@@ -33,7 +33,6 @@
 **Other Tools:**  
 ![Render](https://img.shields.io/badge/-Render-46E3B7?logo=render&logoColor=black)
 ![Redis](https://img.shields.io/badge/-Redis-DC382D?logo=redis&logoColor=white)
-![Cloudinary](https://img.shields.io/badge/-Cloudinary-3448C5?logo=cloudinary&logoColor=white)
 ![GitHub](https://img.shields.io/badge/-GitHub-181717?logo=github&logoColor=white)
 
 ---
@@ -57,3 +56,44 @@
 
 ---
 
+#### 🔐 `.env` Setup (inside `/server`)
+
+Create a `.env` file with the following keys:
+
+#```env
+DEV_MODE=development
+PORT=8080
+MONGO_URI=your_mongodb_connection_string
+EMAIL_USER=your_email@example.com
+EMAIL_PASS=your_app_password
+
+######
+⚙️ Getting Started
+1. Clone the Repository
+bash
+Copy
+Edit
+git clone https://github.com/zaydhassan/mern-blog-final.git
+cd mern-blog-final
+2. Install Dependencies
+bash
+Copy
+Edit
+# Install client-side packages
+cd client
+npm install
+
+# Install server-side packages
+cd ../server
+npm install
+3. Run the App
+bash
+Copy
+Edit
+# Start frontend
+cd client
+npm start
+
+# Start backend
+cd ../server
+npm run dev
