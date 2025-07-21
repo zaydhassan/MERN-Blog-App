@@ -70,30 +70,20 @@ EMAIL_PASS=your_app_password
 ######
 ⚙️ Getting Started
 1. Clone the Repository
-bash
-Copy
-Edit
-git clone https://github.com/zaydhassan/mern-blog-final.git
-cd mern-blog-final
+git clone 
 2. Install Dependencies
-bash
-Copy
-Edit
 # Install client-side packages
 cd client
 npm install
 
 # Install server-side packages
-cd ../server
+cd server
 npm install
 3. Run the App
-bash
-Copy
-Edit
 # Start frontend
 cd client
 npm start
 
 # Start backend
-cd ../server
-npm run dev
+cd server
+npm run server
