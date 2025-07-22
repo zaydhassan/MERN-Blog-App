@@ -74,16 +74,20 @@ git clone
 
 # Install client dependencies
 cd client
+
 npm install
 
 # Install server dependencies
 cd server
+
 npm install
 
 # Run the development servers
 # Start backend
+
 npm run server
 
 # In a separate terminal
 cd client
+
 npm start
