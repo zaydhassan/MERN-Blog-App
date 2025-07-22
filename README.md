@@ -61,10 +61,15 @@
 Create a `.env` file with the following keys:
 
 #```env
+
 DEV_MODE=development
+
 PORT=8080
+
 MONGO_URI=your_mongodb_connection_string
+
 EMAIL_USER=your_email@example.com
+
 EMAIL_PASS=your_app_password
 
 ###### ⚙️ Getting Started
