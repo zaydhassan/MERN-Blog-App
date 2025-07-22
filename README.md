@@ -67,24 +67,23 @@ MONGO_URI=your_mongodb_connection_string
 EMAIL_USER=your_email@example.com
 EMAIL_PASS=your_app_password
 
-######
-⚙️ Getting Started
-1. Clone the Repository
+###### ⚙️ Getting Started
+
+# Clone the repository
 git clone 
-2. Install Dependencies
-# Install client-side packages
+
+# Install client dependencies
 cd client
 npm install
 
-Install server-side packages
+# Install server dependencies
 cd server
 npm install
-3. Run the App
 
-Start frontend
+# Run the development servers
+# Start backend
+npm run server
+
+# In a separate terminal
 cd client
 npm start
-
-Start backend
-cd server
-npm run server
