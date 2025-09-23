@@ -231,7 +231,6 @@ exports.updateBlogController = async (req, res) => {
         return res.status(400).json({ success: false, message: "Invalid blog ID" });
       }
   
-      // Check if the blog exists
       const blog = await blogModel.findById(blogId);
       if (!blog) {
         return res.status(404).json({ success: false, message: "Blog not found" });
