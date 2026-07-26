@@ -42,7 +42,7 @@
 ### 🏠 Home Page
 ![Home Page](./1.png)
 
-### 📰 Blog Details Page
+### 📰 Blog Detail Page
 ![Blog Page](./2.png)
 
 ### 🧩 Featured Blogs + Tags + Trending
