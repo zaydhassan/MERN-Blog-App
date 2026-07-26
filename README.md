@@ -1,4 +1,4 @@
-# 🌐 MERN Blog App
+# 🌐 MERN Blog App !
 
 ![Banner](./1.png)
 
