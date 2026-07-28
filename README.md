@@ -2,7 +2,7 @@
 
 ![Banner](./1.png)
 
-> ✍️ A dynamic full-stack blog platform built with the MERN stack, empowering passionate readers and writers to engage, explore, and express
+> ✍️ A dynamic full-stack blog platform built with the MERN stack, empowering passionate readers and writers to engage, explore, and express.
 
 ---
 
