@@ -6,7 +6,7 @@
 
 ---
 
-## 🚀 Features to be added
+## 🚀 Features 
 
 - 📝 Create, read, edit, and delete blogs
 - 🔐 Secure authentication with RBAC (Role-Based Access Control)
