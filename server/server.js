@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 const dotenv = require("dotenv");
+<<<<<<< HEAD
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const rateLimit = require("express-rate-limit");
@@ -12,19 +13,32 @@ const adminRoutes = require('./routes/adminRoutes');
 const validate = require("./middleware/validate");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 const { contactSchema, newsletterSchema } = require("./validators/schemas");
+=======
+const connectDB = require("./config/db");
+const nodemailer = require("nodemailer");
+const adminRoutes = require('./routes/adminRoutes');
+const populateRewards = require("./scripts/populateReward");
+const multer = require("multer");
+>>>>>>> 94f0376a8509e9530791291eefaed4899f732725
 
 dotenv.config();
 
 const userRoutes = require("./routes/userRoutes");
 const blogRoutes = require('./routes/blogRoutes');
+<<<<<<< HEAD
 const commentRoutes = require('./routes/commentRoutes');
 const likeRoutes = require('./routes/likeRoutes');
+=======
+const commentRoutes = require('./routes/commentRoutes'); 
+const likeRoutes = require('./routes/likeRoutes');       
+>>>>>>> 94f0376a8509e9530791291eefaed4899f732725
 const path = require('path');
 
 connectDB();
 
 const app = express();
 
+<<<<<<< HEAD
 // Trust the proxy so req.protocol / req.ip are correct behind Render/Railway.
 app.set("trust proxy", 1);
 
@@ -72,6 +86,17 @@ app.use("/api/v1/user/register", authLimiter);
 app.use("/api/v1/user/google", authLimiter);
 app.use("/api/v1/user/refresh", authLimiter);
 
+=======
+app.use(cors());
+app.use(express.json());
+app.use(morgan("dev"));
+
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+app.use("/uploads", express.static("uploads"));
+
+>>>>>>> 94f0376a8509e9530791291eefaed4899f732725
 let subscribers = [];
 
 const transporter = nodemailer.createTransport({
@@ -90,9 +115,19 @@ const generateNewsletter = () => `
   <h3>Thanks for joining us!</h3>
 `;
 
+<<<<<<< HEAD
 app.post("/api/v1/newsletter/subscribe", validate(newsletterSchema), (req, res) => {
   const { email } = req.body;
 
+=======
+app.post("/api/v1/newsletter/subscribe", (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ success: false, message: "Email is required." });
+  }
+
+>>>>>>> 94f0376a8509e9530791291eefaed4899f732725
   subscribers.push(email);
 
   const mailOptions = {
@@ -112,6 +147,7 @@ app.post("/api/v1/newsletter/subscribe", validate(newsletterSchema), (req, res) 
   });
 });
 
+<<<<<<< HEAD
 app.post("/api/v1/contact", validate(contactSchema), (req, res) => {
   const { name, email, message } = req.body;
 
@@ -126,6 +162,22 @@ app.post("/api/v1/contact", validate(contactSchema), (req, res) => {
     text: `You received a new message from:
 
     Name: ${safeName}
+=======
+app.post("/api/v1/contact", (req, res) => {
+  const { name, email, message } = req.body;
+
+  if (!name || !email || !message) {
+    return res.status(400).json({ success: false, message: "All fields are required." });
+  }
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: process.env.EMAIL_USER, 
+    subject: `New Contact Form Submission from ${name}`,
+    text: `You received a new message from:
+    
+    Name: ${name}
+>>>>>>> 94f0376a8509e9530791291eefaed4899f732725
     Email: ${email}
     Message: ${message}`,
   };
@@ -142,6 +194,7 @@ app.post("/api/v1/contact", validate(contactSchema), (req, res) => {
 
 app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/blog", blogRoutes);
+<<<<<<< HEAD
 app.use("/api/v1/comments", commentRoutes);
 app.use("/api/v1/likes", likeRoutes);
 app.use("/api/v1/admin", adminRoutes);
@@ -162,6 +215,18 @@ app.get("*", (req, res) => {
 app.use(notFound);
 app.use(errorHandler);
 
+=======
+app.use("/api/v1/comments", commentRoutes); 
+app.use("/api/v1/likes", likeRoutes); 
+app.use("/api/v1/comments", commentRoutes); 
+app.use("/api/v1/admin", adminRoutes);
+app.use(express.static(path.join(__dirname, "../client/build")));
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../client/build", "index.html"));
+});
+
+>>>>>>> 94f0376a8509e9530791291eefaed4899f732725
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
     console.log(

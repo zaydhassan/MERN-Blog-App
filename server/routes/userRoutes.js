@@ -1,11 +1,16 @@
 const express = require("express");
+<<<<<<< HEAD
 const { upload, validateImageFile } = require("../config/upload");
 const validate = require("../middleware/validate");
 const { authenticateUser, isAdmin } = require("../middleware/authMiddleware");
+=======
+const multer = require("multer");
+>>>>>>> 94f0376a8509e9530791291eefaed4899f732725
 const {
   getAllUsers,
   registerController,
   loginController,
+<<<<<<< HEAD
   refreshTokenController,
   logoutController,
   updateUser,
@@ -67,4 +72,36 @@ router.get("/all-users", authenticateUser, isAdmin, getAllUsers);
 // "spam update-points to farm unlimited points" abuse vector.
 router.post("/rewards/redeem", authenticateUser, redeemPoints);
 
+=======
+  updateUser,
+  uploadImage,
+  updateUserPoints,
+  getLeaderboard,
+  updateLikePoints,
+  getUserProfile,
+  redeemPoints,
+  listRewards
+} = require("../controllers/userController");
+
+const router = express.Router();
+const upload = multer({ dest: "uploads/" });
+
+router.get("/all-users", getAllUsers);
+
+router.post("/register", registerController);
+
+router.post("/login", loginController);
+
+router.put('/:userId', updateUser);
+
+router.post("/upload-image", upload.single("image"), uploadImage);
+
+router.post("/update-points", updateUserPoints);
+router.get("/leaderboard", getLeaderboard);
+router.post("/update-like-points", updateLikePoints);
+router.get("/rewards", listRewards);
+router.post("/rewards/redeem", redeemPoints);
+router.get("/:id", getUserProfile);
+
+>>>>>>> 94f0376a8509e9530791291eefaed4899f732725
 module.exports = router;

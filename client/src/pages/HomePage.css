@@ -1,2 +1,161 @@
+<<<<<<< HEAD
 /* Home page styling now lives in sx props + the MUI theme (src/theme/theme.js).
    This file is intentionally kept empty; it is no longer imported. */
+=======
+.Blogdummy {
+    background-color: #3a3f5c; 
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 10px 10px 20px rgba(0, 0, 0, 0.4), -10px -10px 20px rgba(255, 255, 255, 0.1);
+    text-align: center;
+    transition: all 0.3s ease-in-out;
+  }
+  
+  .Blog:hover {
+    box-shadow: 6px 6px 12px rgba(0, 0, 0, 0.5), -6px -6px 12px rgba(255, 255, 255, 0.2);
+    transform: translateY(-5px); 
+    background-color: #4b506e; 
+  }
+  
+  .Blogdummmy img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 15px;
+    margin-bottom: 15px;
+  }
+  
+  .Blog h3 {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #ffffff;
+    margin-bottom: 10px;
+  }
+  
+  .Blogdummy p {
+    font-size: 1rem;
+    color: #d1d1d1;
+    margin-bottom: 15px;
+  }
+  
+  .Blogdummy button {
+    background-color: #5e81ac;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.3s;
+    box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.3), -4px -4px 8px rgba(255, 255, 255, 0.1);
+  }
+  
+  .Blogdummy button:hover {
+    background-color: #4c699f;
+    transform: scale(1.1);
+  }
+
+  .HeroSection {
+    text-align: center;
+    padding: 80px 20px;
+    border-radius: 10px;
+    margin: 5px 0;
+    box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.2);
+    color: #ffffff;
+    height: 70vh;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: rgba(0, 0, 0, 0.5);
+    background-blend-mode: overlay;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    transition: background-image 1s ease-in-out;
+}
+
+  .HeroSection h1 {
+    font-size: 3.3rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    letter-spacing: 1px;
+    text-transform: capitalize;
+    color: #ffffff;
+    z-index: 2;
+  }
+  
+  .HeroSection p {
+    font-size: 1.35rem;
+    line-height: 1.8;
+    max-width: 600px;
+    margin: 0 auto;
+    color: #e0e0e0; 
+    z-index: 2;
+  }
+  
+  .newsletter-section {
+    position: relative;
+    overflow: hidden;
+    padding: 50px;
+    border-radius: 15px;
+    background: radial-gradient(circle, rgba(63, 94, 251, 1) 0%, rgba(70, 230, 215, 1) 100%);
+    color: white;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    transition: transform 0.4s ease;
+  }
+  
+  .newsletter-section:hover {
+    transform: scale(1.03);
+  }
+  
+  .newsletter-section::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+    z-index: 0;
+    animation: glowing-bg 6s infinite alternate ease-in-out;
+    border-radius: 15px;
+  }
+  
+  .newsletter-section-content {
+    position: relative;
+    z-index: 2;
+  }
+  
+  .subscribe-button {
+    background: linear-gradient(135deg, #ff9a9e, #fad0c4, #fbc2eb);
+    color: black !important; 
+    padding: 12px 30px;
+    font-size: 19px;
+    font-weight: bold;
+    border-radius: 30px;
+    box-shadow: 0 10px 25px rgba(155, 105, 180, 0.5);
+    transition: all 0.3s ease;
+    border: none;
+}
+
+.dark-mode .subscribe-button {
+    background: linear-gradient(135deg, #5e81ac, #4c699f, #2e3440); /* Darker tones */
+    color: white !important;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+  .subscribe-button:hover {
+    background: linear-gradient(135deg, #fbc2eb, #a18cd1, #fad0c4);
+    box-shadow: 0 15px 40px rgba(255, 105, 180, 0.7);
+  }
+
+  @keyframes glowing-bg {
+    0% {
+      background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+    }
+    100% {
+      background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+    }
+  }
+>>>>>>> 94f0376a8509e9530791291eefaed4899f732725
