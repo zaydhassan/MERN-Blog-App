@@ -1,0 +1,257 @@
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
+import { AppBar, Toolbar, IconButton, Button, MenuItem, Menu, Drawer, Box, Stack, Container } from "@mui/material";
+import { motion } from "framer-motion";
+import MenuIcon from "@mui/icons-material/Menu";
+import NightsStayIcon from "@mui/icons-material/NightsStay";
+import Brightness5Icon from "@mui/icons-material/Brightness5";
+import toast from "react-hot-toast";
+import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
+import GradientButton from "./GradientButton";
+import UserAvatar from "./UserAvatar";
+import BrandLogo from "./BrandLogo";
+import { authActions } from "../redux/store";
+
+const NAV_ITEMS = [
+  { label: "Home", path: "/", match: (p) => p === "/" },
+  { label: "About", path: "/about", match: (p) => p === "/about" },
+  { label: "Blogs", path: "/blogs", match: (p) => p.startsWith("/blogs") || p.startsWith("/category") },
+  { label: "Contact", path: "/contact", match: (p) => p === "/contact" },
+];
+
+// Filled-pill active state (brandSoft bg + terracotta text) reads more
+// "premium SaaS" than a thin under-bar, and stays legible in both modes.
+const navBtnSx = (active) => ({
+  color: active ? "primary.main" : "text.secondary",
+  fontWeight: active ? 700 : 600,
+  textTransform: "none",
+  borderRadius: 999,
+  px: { xs: 1.5, md: 2 },
+  py: 0.75,
+  minWidth: "auto",
+  transition: "color .2s ease, background-color .2s ease",
+  "&:hover": { color: "primary.main", backgroundColor: "brandSoft" },
+  ...(active ? { backgroundColor: "brandSoft" } : {}),
+});
+
+const Navbar = () => {
+  const navigate = useNavigate();
+  const isLogin = useSelector((state) => state.auth.isLogin);
+  const user = useSelector((state) => state.auth.user);
+  const { theme, toggleTheme } = useTheme();
+  const { logout } = useAuth();
+  const dispatch = useDispatch();
+  const location = useLocation();
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Scroll-aware elevation: the floating pill gains a soft card shadow once
+  // the page is scrolled, so it reads as lifted over content.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Close both the avatar menu and the mobile drawer on route change.
+  useEffect(() => {
+    setAnchorEl(null);
+    setMobileOpen(false);
+  }, [location]);
+
+  const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
+  const handleMenu = (event) => { event.stopPropagation(); setAnchorEl(event.currentTarget); };
+  const handleClose = () => setAnchorEl(null);
+
+  const handleLogout = async () => {
+    // Unified logout: clears the refresh cookie (server), Firebase session,
+    // and local auth state, then syncs the Redux store.
+    await logout();
+    dispatch(authActions.logout());
+    toast.success("Logged out Successfully");
+    navigate("/");
+  };
+
+  const handleNavigation = (path) => (isLogin ? navigate(path) : navigate("/login"));
+
+  return (
+    <AppBar
+      position="sticky"
+      elevation={0}
+      // Neutralize the global glass-AppBar override so the floating pill below
+      // is the only glass surface (the bar itself is fully transparent).
+      sx={{
+        bgcolor: "transparent !important",
+        backgroundImage: "none !important",
+        boxShadow: "none !important",
+        borderBottom: "none !important",
+        backdropFilter: "none !important",
+        WebkitBackdropFilter: "none !important",
+      }}
+    >
+      <Container maxWidth="lg" disableGutters sx={{ px: { xs: 1.5, md: 2.5 } }}>
+        <motion.div
+          initial={{ y: -18, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
+          <Toolbar
+            disableGutters
+            sx={{
+              my: { xs: 1.25, md: 1.75 },
+              px: { xs: 1.5, md: 2 },
+              py: 0.75,
+              borderRadius: 999,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 1.5,
+              bgcolor: "background.glass",
+              backdropFilter: "blur(14px)",
+              WebkitBackdropFilter: "blur(14px)",
+              border: (t) => `1px solid ${t.palette.divider}`,
+              boxShadow: scrolled
+                ? (t) => t.customShadows?.card || "0 12px 36px rgba(0,0,0,0.12)"
+                : "0 1px 2px rgba(0,0,0,0.04)",
+              transition: "box-shadow .35s ease, margin .35s ease",
+            }}
+          >
+            <IconButton edge="start" color="inherit" aria-label="menu" sx={{ display: { md: "none" } }} onClick={handleDrawerToggle}>
+              <MenuIcon />
+            </IconButton>
+
+            <Box
+              onClick={() => navigate("/")}
+              role="button"
+              aria-label="Inkwell home"
+              tabIndex={0}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                cursor: "pointer",
+                borderRadius: 2,
+                p: 0.5,
+                transition: "opacity .2s ease, transform .2s ease",
+                "&:hover": { opacity: 0.92, transform: "translateY(-1px)" },
+              }}
+            >
+              <BrandLogo size={38} />
+            </Box>
+
+            <Stack direction="row" spacing={0.5} sx={{ flexGrow: 1, justifyContent: "center", display: { xs: "none", md: "flex" } }}>
+              {NAV_ITEMS.map((item) => {
+                const active = item.match(location.pathname);
+                return (
+                  <Button key={item.label} sx={navBtnSx(active)} onClick={() => navigate(item.path)}>
+                    {item.label}
+                  </Button>
+                );
+              })}
+            </Stack>
+
+            {/* Spacer keeps the actions right-aligned on mobile when the nav row is hidden. */}
+            <Box sx={{ flexGrow: 1, display: { xs: "block", md: "none" } }} />
+
+            <Drawer
+              anchor="left"
+              open={mobileOpen}
+              onClose={handleDrawerToggle}
+              PaperProps={{ sx: { width: 280, p: 2.5 } }}
+            >
+              <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+                <Box sx={{ px: 1, py: 1, mb: 2 }}>
+                  <BrandLogo size={34} onClick={() => { navigate("/"); setMobileOpen(false); }} />
+                </Box>
+                <Stack spacing={0.5} sx={{ flexGrow: 1 }}>
+                  {NAV_ITEMS.map((item) => {
+                    const active = item.match(location.pathname);
+                    return (
+                      <Button
+                        key={item.label}
+                        fullWidth
+                        sx={{
+                          justifyContent: "flex-start",
+                          textTransform: "none",
+                          fontWeight: active ? 700 : 600,
+                          borderRadius: 2,
+                          px: 2,
+                          py: 1.25,
+                          color: active ? "primary.main" : "text.secondary",
+                          backgroundColor: active ? "brandSoft" : "transparent",
+                          "&:hover": { backgroundColor: "brandSoft", color: "primary.main" },
+                        }}
+                        onClick={() => (item.label === "Blogs" ? handleNavigation(item.path) : navigate(item.path))}
+                      >
+                        {item.label}
+                      </Button>
+                    );
+                  })}
+                </Stack>
+              </Box>
+            </Drawer>
+
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+              {isLogin && (
+                <>
+                  <IconButton
+                    onClick={toggleTheme}
+                    color="inherit"
+                    aria-label="Toggle light/dark theme"
+                    sx={{ borderRadius: 999, "&:hover": { backgroundColor: "action.hover" } }}
+                  >
+                    {theme === "light" ? <Brightness5Icon /> : <NightsStayIcon />}
+                  </IconButton>
+                  <IconButton onClick={handleMenu} aria-label="Account menu" sx={{ p: 0, borderRadius: 999 }}>
+                    <UserAvatar
+                      src={user?.profile_image}
+                      name={user?.username}
+                      alt="Profile"
+                      sx={{ width: 40, height: 40, border: (t) => `2px solid ${t.palette.primary.main}` }}
+                    />
+                  </IconButton>
+                  <Menu
+                    anchorEl={anchorEl}
+                    open={Boolean(anchorEl)}
+                    onClose={handleClose}
+                    slotProps={{ paper: { sx: { mt: 1.5, borderRadius: 3, overflow: "hidden" } } }}
+                  >
+                    <MenuItem onClick={() => { navigate("/profile"); handleClose(); }}>Profile</MenuItem>
+                    <MenuItem onClick={() => { handleNavigation("/my-blogs"); handleClose(); }}>My Blogs</MenuItem>
+                    <MenuItem onClick={() => { handleNavigation("/create-blog"); handleClose(); }}>Create Blog</MenuItem>
+                    <MenuItem onClick={handleLogout}>Logout</MenuItem>
+                  </Menu>
+                </>
+              )}
+              {!isLogin && (
+                <GradientButton
+                  onClick={() => navigate("/login")}
+                  sx={{
+                    borderRadius: 999,
+                    px: 2.75,
+                    py: 0.9,
+                    minHeight: 0,
+                    fontWeight: 700,
+                    fontSize: "0.85rem",
+                    letterSpacing: "0.01em",
+                    boxShadow: (t) => t.customShadows?.card,
+                    "&:hover": {
+                      boxShadow: (t) => t.customShadows?.cardHover,
+                    },
+                  }}
+                >
+                  Login
+                </GradientButton>
+              )}
+            </Box>
+          </Toolbar>
+        </motion.div>
+      </Container>
+    </AppBar>
+  );
+};
+
+export default Navbar;

@@ -1,0 +1,80 @@
+/* Quill overrides for the Inkwell terracotta theme. Loaded AFTER
+   quill.snow.css in CreateBlog/EditBlog. Light-mode tweaks apply to
+   `.ql-snow` unconditionally; dark-mode overrides are keyed on the
+   `data-theme="dark"` attribute set on <html> by ThemeContext, so the
+   editor flips with the rest of the app. Colors read the CSS-variable
+   layer from index.css. */
+
+.ql-snow.ql-toolbar button:hover .ql-stroke,
+.ql-snow.ql-toolbar button.ql-active .ql-stroke,
+.ql-snow.ql-toolbar button:hover .ql-fill,
+.ql-snow.ql-toolbar button.ql-active .ql-fill {
+  stroke: var(--accent);
+}
+.ql-snow.ql-toolbar button:hover .ql-stroke,
+.ql-snow.ql-toolbar button.ql-active .ql-stroke {
+  stroke: var(--accent);
+}
+
+.ql-container.ql-snow {
+  border-color: var(--divider) !important;
+  border-radius: 0 0 12px 12px;
+  font-family: "Inter", sans-serif;
+  color: var(--text);
+}
+
+.ql-toolbar.ql-snow {
+  border-color: var(--divider) !important;
+  border-radius: 12px 12px 0 0;
+}
+
+.ql-editor {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.ql-editor.ql-blank::before {
+  color: var(--text-secondary);
+  font-style: normal;
+  opacity: 0.6;
+}
+
+/* Dark mode overrides */
+[data-theme="dark"] .ql-snow.ql-toolbar {
+  background: var(--surface);
+  border-color: var(--divider) !important;
+}
+[data-theme="dark"] .ql-snow.ql-toolbar button,
+[data-theme="dark"] .ql-snow .ql-stroke {
+  color: var(--text-secondary);
+}
+[data-theme="dark"] .ql-snow.ql-toolbar button:hover .ql-stroke,
+[data-theme="dark"] .ql-snow.ql-toolbar button.ql-active .ql-stroke {
+  stroke: var(--accent-light);
+}
+[data-theme="dark"] .ql-container.ql-snow {
+  background: var(--surface);
+  border-color: var(--divider) !important;
+  color: var(--text);
+}
+[data-theme="dark"] .ql-editor {
+  background: var(--surface);
+  color: var(--text);
+}
+[data-theme="dark"] .ql-editor.ql-blank::before {
+  color: var(--text-secondary);
+}
+[data-theme="dark"] .ql-snow .ql-picker-label {
+  color: var(--text-secondary);
+}
+[data-theme="dark"] .ql-snow .ql-picker-options {
+  background: var(--surface);
+  border-color: var(--divider);
+  color: var(--text);
+}
+[data-theme="dark"] .ql-snow .ql-tooltip {
+  background: var(--surface);
+  border-color: var(--divider);
+  color: var(--text);
+  box-shadow: var(--shadow-card);
+}

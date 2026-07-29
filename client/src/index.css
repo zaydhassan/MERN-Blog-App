@@ -1,0 +1,120 @@
+/* ─────────────────────────────────────────────────────────────────────
+   Inkwell global styles + CSS-variable layer.
+   These vars mirror the MUI tokens in src/theme/theme.js and switch on
+   the `data-theme` attribute set by ThemeContext. The raw `.css` page
+   files (HomePage/Blogs/BlogDetails/About/Navbar) read these vars so
+   they react to dark mode without per-selector rewrites.
+   ───────────────────────────────────────────────────────────────────── */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #faf7f2;
+  --bg-gradient: linear-gradient(180deg, #faf7f2 0%, #f3ece2 100%);
+  --surface: #ffffff;
+  --surface-glass: rgba(255, 255, 255, 0.65);
+  --text: #1f1b16;
+  --text-secondary: #5c534a;
+  --text-disabled: #9a9088;
+  --divider: rgba(31, 27, 22, 0.1);
+  --accent: #c2410c;
+  --accent-light: #e8693a;
+  --accent-dark: #9a2e08;
+  --accent-soft: rgba(194, 65, 12, 0.12);
+  --accent-softer: rgba(194, 65, 12, 0.07);
+  --badge: #0ea5e9;
+  --shadow-card: 0 4px 20px rgba(31, 27, 22, 0.06);
+  --shadow-glass: 0 8px 32px rgba(31, 27, 22, 0.1);
+  --shadow-glow: 0 12px 36px rgba(194, 65, 12, 0.18);
+  --glow-ring: 0 0 0 4px rgba(194, 65, 12, 0.18);
+  --ambient: radial-gradient(circle at 100% 0%, rgba(194, 65, 12, 0.1), transparent 42%);
+}
+
+[data-theme="dark"] {
+  --bg: #161210;
+  --bg-gradient: linear-gradient(180deg, #161210 0%, #1f1a16 100%);
+  --surface: #211c18;
+  --surface-glass: rgba(33, 28, 24, 0.55);
+  --text: #f5efe7;
+  --text-secondary: #b8aea3;
+  --text-disabled: #6b6258;
+  --divider: rgba(245, 239, 231, 0.1);
+  --accent: #c2410c;
+  --accent-light: #e8693a;
+  --accent-dark: #9a2e08;
+  --accent-soft: rgba(232, 105, 58, 0.18);
+  --accent-softer: rgba(232, 105, 58, 0.1);
+  --badge: #0ea5e9;
+  --shadow-card: 0 8px 28px rgba(0, 0, 0, 0.45);
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 12px 40px rgba(232, 105, 58, 0.28);
+  --glow-ring: 0 0 0 4px rgba(194, 65, 12, 0.18);
+  --ambient: radial-gradient(circle at 100% 0%, rgba(232, 105, 58, 0.14), transparent 42%);
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg-gradient);
+  background-attachment: fixed;
+  color: var(--text);
+  /* subtle fixed terracotta ambient glow for SaaS depth */
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: var(--ambient);
+  pointer-events: none;
+  z-index: 0;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+a {
+  color: var(--accent);
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+::selection {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Firefox scrollbar */
+html {
+  scrollbar-color: var(--accent) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--divider);
+  border-radius: 999;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}

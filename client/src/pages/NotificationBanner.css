@@ -1,0 +1,80 @@
+.notification-banner {
+    position: fixed;
+    top: -100px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 10px 20px;
+    background-color: #3f51b5;
+    color: white;
+    font-size: 18px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    transition: all 0.5s ease;
+    z-index: 999;
+  }
+  
+  .notification-banner.show {
+    top: 20px;
+    opacity: 1;
+  }
+  
+  .loading-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background-color: #fff;
+    border-radius: 0 0 8px 8px;
+    overflow: hidden;
+  }
+  
+  .loading-bar::after {
+    content: "";
+    display: block;
+    height: 100%;
+    width: 100%;
+    background-color:#3ec427;
+    animation: loadProgress 5s linear forwards;
+    border-radius: 0 0 8px 8px;
+  }
+  
+  @keyframes loadProgress {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0%);
+    }
+  }
+  
+  .waving-hand::before {
+    content: "👋";
+    display: inline-block;
+    animation: wave 1s ease-in-out infinite;
+    transform-origin: 70% 70%;
+  }
+  
+  /* Keyframes for hand wave */
+  @keyframes wave {
+    0% {
+      transform: rotate(0deg);
+    }
+    15% {
+      transform: rotate(15deg);
+    }
+    30% {
+      transform: rotate(-10deg);
+    }
+    45% {
+      transform: rotate(12deg);
+    }
+    60% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(0deg);
+    }
+  }
+  

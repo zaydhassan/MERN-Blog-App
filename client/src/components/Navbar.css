@@ -1,0 +1,2 @@
+/* Navbar styling now lives in the MUI theme (src/theme/theme.js) + sx props.
+   This file is intentionally kept empty; it is no longer imported. */
