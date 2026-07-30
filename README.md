@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Inkwell — MERN Blog Platform
 
 > A production-grade, full-stack blogging platform: writers publish, readers
@@ -25,31 +24,11 @@
 - **UX** — light/dark theme, responsive layouts, skeleton loading states,
   validate-on-blur field validation, paginated comment loading, accessible
   forms.
-=======
-# 🌐 MERN Blog App 
-
-![Banner](./1.png)
-
-> ✍️ A dynamic full-stack blog platform built with the MERN stack, empowering passionate readers and writers to engage, explore, and express.
-
----
-
-## 🚀 Features 
-
-- 📝 Create, read, edit, and delete blogs
-- 🔐 Secure authentication with RBAC (Role-Based Access Control)
-- 💬 Commenting, liking, and sharing functionality
-- 🧠 Category & tag-based blog filtering
-- 📨 Newsletter subscription system
-- 🏆 Writer levels, rewards, and leaderboard system
-- 📱 Responsive design using Tailwind CSS
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
 
 ---
 
 ## 🛠️ Tech Stack
 
-<<<<<<< HEAD
 | Layer | Technology |
 |-------|------------|
 | Frontend | React 18, Vite 6, Material UI, Tailwind, Framer Motion, Redux Toolkit, React Router 7 |
@@ -60,22 +39,6 @@
 | Auth server | JWT (`jsonwebtoken`), bcryptjs, httpOnly refresh cookies |
 | Security | Helmet, express-rate-limit, express-mongo-sanitize, Zod request validation |
 | Mail | Nodemailer (contact form + newsletter) |
-=======
-**Frontend:**  
-![React](https://img.shields.io/badge/-React-61DAFB?logo=react&logoColor=black)
-![Redux](https://img.shields.io/badge/-Redux-764ABC?logo=redux&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/-TailwindCSS-38B2AC?logo=tailwind-css&logoColor=white)
-
-**Backend:**  
-![Node.js](https://img.shields.io/badge/-Node.js-339933?logo=node.js&logoColor=white)
-![Express.js](https://img.shields.io/badge/-Express.js-000000?logo=express&logoColor=white)
-![MongoDB](https://img.shields.io/badge/-MongoDB-47A248?logo=mongodb&logoColor=white)
-
-**Other Tools:**  
-![Render](https://img.shields.io/badge/-Render-46E3B7?logo=render&logoColor=black)
-![Redis](https://img.shields.io/badge/-Redis-DC382D?logo=redis&logoColor=white)
-![GitHub](https://img.shields.io/badge/-GitHub-181717?logo=github&logoColor=white)
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
 
 ---
 
@@ -98,7 +61,6 @@
 
 ---
 
-<<<<<<< HEAD
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -324,45 +286,3 @@ MERN Blog App/
 ## 📝 License
 
 ISC — authored by zayd.
-=======
-#### 🔐 `.env` Setup (inside `/server`)
-
-Create a `.env` file with the following keys:
-
-#```env
-
-DEV_MODE=development
-
-PORT=8080
-
-MONGO_URI=your_mongodb_connection_string
-
-EMAIL_USER=your_email@example.com
-
-EMAIL_PASS=your_app_password
-
-###### ⚙️ Getting Started
-
-# Clone the repository
-git clone 
-
-# Install client dependencies
-cd client
-
-npm install
-
-# Install server dependencies
-cd server
-
-npm install
-
-# Run the development servers
-# Start backend
-
-npm run server
-
-# In a separate terminal
-cd client
-
-npm start
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725

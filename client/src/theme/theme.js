@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { createTheme } from "@mui/material/styles";
 
 // ─────────────────────────────────────────────────────────────────────
@@ -370,24 +369,3 @@ const buildTheme = (mode) => {
 export const lightTheme = buildTheme("light");
 export const darkTheme = buildTheme("dark");
 export { buildTheme, FONT_DISPLAY, FONT_BODY, FONT_MONO };
-=======
-import { createTheme } from '@mui/material/styles';
-
-export const lightTheme = createTheme({
-  palette: {
-    mode: 'light',
-    background: {
-      default: "#fff", 
-    },
-  },
-});
-
-export const darkTheme = createTheme({
-  palette: {
-    mode: 'dark',
-    background: {
-      default: "#121212", 
-    },
-  },
-});
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725

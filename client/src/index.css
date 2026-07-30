@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 /* ─────────────────────────────────────────────────────────────────────
    Inkwell global styles + CSS-variable layer.
    These vars mirror the MUI tokens in src/theme/theme.js and switch on
@@ -119,16 +118,3 @@ html {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent);
 }
-=======
-
-
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
-  
-  body {
-    font-family: "roboto", sans-serif;
-  }
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725

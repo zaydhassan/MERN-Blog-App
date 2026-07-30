@@ -14,7 +14,6 @@ const CommentSchema = new mongoose.Schema({
   reportedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "users", default: [] }]
 });
 
-<<<<<<< HEAD
 // The dominant query is "all comments for a blog, oldest first".
 CommentSchema.index({ blog_id: 1, created_at: 1 });
 // Supports user-scoped queries: getRecommendedBlogs (distinct blog_id by
@@ -24,8 +23,3 @@ CommentSchema.index({ user_id: 1 });
 const Comment = mongoose.models.Comment || mongoose.model("Comment", CommentSchema);
 
 module.exports = Comment;
-=======
-const Comment = mongoose.models.Comment || mongoose.model("Comment", CommentSchema);
-
-module.exports = Comment;
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725

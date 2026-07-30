@@ -10,7 +10,6 @@ const userSchema = new mongoose.Schema(
     email: {
       type: String,
       required: [true, "email is required"],
-<<<<<<< HEAD
       unique: true,
       trim: true,
       lowercase: true,
@@ -28,13 +27,6 @@ const userSchema = new mongoose.Schema(
     // accounts); `providerId` is the Firebase UID from the verified ID token.
     provider: { type: String, default: null },
     providerId: { type: String, default: null },
-=======
-    },
-    password: {
-      type: String,
-      required: [true, "password is required"],
-    },
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
     role: {
       type: String,
       required: [true, "role is required"],
@@ -49,19 +41,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: ""
     },
-<<<<<<< HEAD
     // The denormalized `blogs: [ObjectId]` array that used to live here is
     // gone — blogModel.user is the source of truth and is queried directly
     // (userBlogController). The array was never read by the client and was
     // only maintained by a push in createBlogController, now removed.
-=======
-    blogs: [
-      {
-        type: mongoose.Types.ObjectId,
-        ref:"Blog",
-      },
-    ],
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
     points: {
       type: Number,
       default: 0
@@ -90,12 +73,9 @@ const userSchema = new mongoose.Schema(
   { timestamps: true,  collection: "users" }  
 );
 
-<<<<<<< HEAD
 // Compound index for the leaderboard query (filter by role, sort by points).
 userSchema.index({ role: 1, points: -1 });
 
-=======
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
 const userModel = mongoose.model("users", userSchema);
 
 module.exports = userModel;

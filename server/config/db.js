@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-<<<<<<< HEAD
 
 // Connect to MongoDB using MONGO_URL. A missing/invalid URL or an unreachable
 // server is a fatal, start-of-run condition — if we swallowed it (as the old
@@ -19,16 +18,6 @@ const connectDB = async () => {
   } catch (error) {
     console.error(`MONGO Connect Error: ${error.message}`);
     process.exit(1);
-=======
-const connectDB = async () => {
-  try {
-    await mongoose.connect(process.env.MONGO_URL);
-    console.log(
-      `Mongodb Connected`  
-    );
-  } catch (error) {
-    console.log(`MONGO Connect Error ${error}`);
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
   }
 };
 

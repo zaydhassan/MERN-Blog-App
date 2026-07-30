@@ -1,7 +1,2 @@
-<<<<<<< HEAD
 # Ignore environment variables
 .env
-=======
-# Ignore environment variables
-.env
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725

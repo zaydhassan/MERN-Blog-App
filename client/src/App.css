@@ -1,23 +1,2 @@
-<<<<<<< HEAD
 /* App-level styles now live in the MUI theme (src/theme/theme.js) + index.css.
    This file is intentionally kept empty; it is no longer imported. */
-=======
-
-.navbar-toolbar {
-    justify-content: space-between; 
-    width: 100%;
-}
-
-.nav-center {
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-    flex-grow: 1; 
-}
-
-.nav-item {
-    padding: 10px 20px; 
-    margin: 0 10px; 
-    text-transform: uppercase; 
-}
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725

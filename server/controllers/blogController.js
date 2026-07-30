@@ -3,7 +3,6 @@ const userModel = require("../models/userModel");
 const mongoose= require("mongoose");
 const Tag = require("../models/Tag");
 const BlogTag = require("../models/BlogTag");
-<<<<<<< HEAD
 const Comment = require("../models/commentModel");
 const Like = require("../models/likeModel");
 const BlogView = require("../models/blogViewModel");
@@ -54,24 +53,10 @@ exports.getTrendingBlogs = async (req, res) => {
   } catch (error) {
     console.error("Error fetching trending blogs:", error.message);
     res.status(500).json({ success: false, message: "Error fetching trending blogs" });
-=======
-
-exports.getTrendingBlogs = async (req, res) => {
-  try {
-    const trendingBlogs = await blogModel.find()
-      .sort({ likes: -1, views: -1, "comments.length": -1 }) 
-      .limit(5) 
-      .populate("user", "username profile_image"); 
-
-    return res.status(200).json({ success: true, trending: trendingBlogs });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Error fetching trending blogs", error });
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
   }
 };
 
 exports.getRecommendedBlogs = async (req, res) => {
-<<<<<<< HEAD
   // Use the authenticated user; ignore the client-supplied :userId param.
   const userId = req.user._id;
 
@@ -99,36 +84,17 @@ exports.getRecommendedBlogs = async (req, res) => {
         .sort({ created_at: -1 })
         .populate("user", "username profile_image")
         .limit(5);
-=======
-  const { userId } = req.params;
-  
-  try {
-    
-    const userActivityBlogs = await blogModel.find({
-      $or: [{ likes: userId }, { "comments.user": userId }],
-    }).limit(5);
-
-    let recommendedBlogs = userActivityBlogs;
-
-    if (recommendedBlogs.length === 0) {
-      recommendedBlogs = await blogModel.find().sort({ created_at: -1 }).limit(5);
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
     }
 
     return res.status(200).json({ success: true, recommendations: recommendedBlogs });
   } catch (error) {
-<<<<<<< HEAD
     console.error("Error fetching recommended blogs:", error.message);
     res.status(500).json({ success: false, message: "Error fetching recommended blogs." });
-=======
-    res.status(500).json({ success: false, message: "Error fetching recommended blogs", error });
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
   }
 };
 
 exports.getAllBlogsController = async (req, res) => {
   try {
-<<<<<<< HEAD
     const { page, limit, skip, searchRegex } = parsePagination(req);
     const filter = { status: "Published" };
     if (searchRegex) {
@@ -155,37 +121,12 @@ exports.getAllBlogsController = async (req, res) => {
       message: "All Blogs lists",
       blogs,
       ...paginateMeta(page, limit, total),
-=======
-    const blogs = await blogModel
-      .find({ status: "Published" })
-      .populate({
-        path: "user",
-        select: "username profile_image"
-      })
-      .populate("tags", "tag_name");
-    if (!blogs.length) {
-      return res.status(200).json({ success: false, message: "No Blogs Found", blogs: [] });
-    }
-    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.set("Pragma", "no-cache");
-    res.set("Expires", "0");
-    
-    return res.status(200).json({
-      success: true,
-      BlogCount: blogs.length,
-      message: "All Blogs lists",
-      blogs,
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
     });
   } catch (error) {
     console.error("Error Fetching Blogs:", error);
     return res.status(500).json({
       success: false,
       message: "Error While Getting Blogs",
-<<<<<<< HEAD
-=======
-      error: error.toString(),
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
     });
   }
 };
@@ -193,7 +134,6 @@ exports.getAllBlogsController = async (req, res) => {
   exports.getBlogsByCategory = async (req, res) => {
     const category = req.params.category;
     try {
-<<<<<<< HEAD
         const { page, limit, skip, searchRegex } = parsePagination(req);
         const filter = { category, status: "Published" };
         if (searchRegex) {
@@ -336,91 +276,6 @@ exports.createBlogController = async (req, res) => {
       console.error("Create blog error:", error.message);
       return res.status(400).json({ success: false, message: "Error while creating blog." });
     }
-=======
-        const blogs = await blogModel.find({ category: category }).populate('user');
-        if (blogs.length > 0) {
-            res.status(200).json({ success: true, blogs });
-        } else {
-            res.status(404).json({ success: false, message: 'No blogs found for this category' });
-        }
-    } catch (error) {
-        console.error("Error fetching blogs by category:", error);
-        res.status(500).json({ success: false, message: "Error fetching blogs by category", error: error.toString() });
-    }
-};
-
-exports.createBlogController = async(req,res) => {
-    try {
-      const uploadedImage = req.file ? `/uploads/${req.file.filename}` : req.body.image;
-
-      const { title, description, category, tags = [], status = 'Draft', user } = req.body;
-      
-      if (!title || !description || !category || !user) {
-            return res.status(400).send({
-                success: false,
-                message: "Please Provide all fields",
-            });
-        }
-        if (!uploadedImage) {
-          return res.status(400).json({ success: false, message: "Image file is required" });
-      }
-
-        const existingUser= await userModel.findById(user);
-     if(!existingUser){
-        return res.status(404).send({
-            success: false,
-            message:'unable to find user',
-        });
-     }
-     let parsedTags;
-        try {
-            parsedTags = JSON.parse(tags);
-            if (!Array.isArray(parsedTags)) parsedTags = [];
-        } catch (error) {
-            parsedTags = [];
-        }
-
-        const tagIds = await Promise.all(
-          parsedTags.map(async (tagName) => {
-              let tag = await Tag.findOne({ tag_name: tagName });
-              if (!tag) {
-                  tag = new Tag({ tag_name: tagName });
-                  await tag.save();
-              }
-              return tag._id;
-          })
-      );
-        const newBlog = new blogModel({title, description,image: uploadedImage,category, tags: tagIds,  user: req.user._id,status: status || 'Draft', views: 0});
-        const session = await mongoose.startSession();
-    session.startTransaction();
-    await newBlog.save({ session });
-    existingUser.blogs.push(newBlog);
-    await existingUser.save({ session });
-
-    await Promise.all(tagIds.map(async (tagId) => {
-      const blogTag = new BlogTag({
-        blog_id: newBlog._id,
-        tag_id: tagId
-      });
-      await blogTag.save({ session });
-    }));
-
-    await session.commitTransaction();
-        await newBlog.save();
-        return res.status(201).send({
-            success:true,
-            message: "Blog Created!",
-            newBlog,
-        });
-    } catch (error) {
-        console.log(error);
-        return res.status(400).send({
-            success: false,
-            message: "Error while creating Blog",
-            error
-    })
-}
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
 };
 
 exports.updateBlogController = async (req, res) => {
@@ -428,7 +283,6 @@ exports.updateBlogController = async (req, res) => {
       const { id } = req.params;
       const { title, description, image, status, category, tags } = req.body;
 
-<<<<<<< HEAD
       const blog = await blogModel.findById(id);
       if (!blog) {
           return res.status(404).json({ success: false, message: "Blog not found." });
@@ -471,29 +325,12 @@ exports.updateBlogController = async (req, res) => {
   } catch (error) {
       console.error("Error updating blog:", error.message);
       return res.status(500).json({ success: false, message: "Error updating blog." });
-=======
-      const updatedBlog = await blogModel.findByIdAndUpdate(
-          id,
-          { title, description, image, status, category, tags },
-          { new: true }
-      );
-
-      if (!updatedBlog) {
-          return res.status(404).json({ success: false, message: "Blog not found" });
-      }
-
-      return res.status(200).json({ success: true, message: "Blog Updated!", blog: updatedBlog });
-  } catch (error) {
-      console.error("Error updating blog:", error);
-      return res.status(500).json({ success: false, message: "Error updating blog", error: error.message });
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
   }
 };
 
   exports.getUserDrafts = async (req, res) => {
     try {
         const { userId } = req.params;
-<<<<<<< HEAD
         // A user may only read their own drafts (Admin may read anyone's).
         if (String(userId) !== String(req.user._id) && req.user.role !== "Admin") {
           return res.status(403).json({ success: false, message: "Not allowed." });
@@ -504,27 +341,12 @@ exports.updateBlogController = async (req, res) => {
     } catch (error) {
         console.error("Error retrieving drafts:", error.message);
         res.status(500).json({ success: false, message: "Error retrieving drafts." });
-=======
-        const drafts = await blogModel.find({ user: userId, status: 'Draft' });
-        
-        res.status(200).send({
-            success: true,
-            drafts
-        });
-    } catch (error) {
-        res.status(500).send({
-            success: false,
-            message: "Error retrieving drafts",
-            error: error.message
-        });
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
     }
 };
   
   exports.getBlogByIdController = async (req, res) => {
     try {
       const { id } = req.params;
-<<<<<<< HEAD
 
       if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ success: false, message: "Invalid blog ID." });
@@ -573,26 +395,6 @@ exports.updateBlogController = async (req, res) => {
       return res.status(500).json({
         success: false,
         message: "Error while getting single blog.",
-=======
-      const blog = await blogModel.findById(id).populate('user', 'username profile_image');
-      if (!blog) {
-        return res.status(404).send({
-          success: false,
-          message: "blog not found with this ID",
-        });
-      }
-      return res.status(200).send({
-        success: true,
-        message: "fetched single blog",
-        blog,
-      });
-    } catch (error) {
-      console.log(error);
-      return res.status(400).send({
-        success: false,
-        message: "error while getting single blog",
-        error,
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
       });
     }
   };
@@ -609,7 +411,6 @@ exports.updateBlogController = async (req, res) => {
       if (!blog) {
         return res.status(404).json({ success: false, message: "Blog not found" });
       }
-<<<<<<< HEAD
       // Ownership: only the author (or an Admin) may delete.
       if (String(blog.user) !== String(req.user._id) && req.user.role !== "Admin") {
         return res.status(403).json({ success: false, message: "Not allowed to delete this blog." });
@@ -632,21 +433,11 @@ exports.updateBlogController = async (req, res) => {
     } catch (error) {
       console.error("Error deleting blog:", error.message);
       return res.status(500).json({ success: false, message: "Internal Server Error." });
-=======
-  
-      await blogModel.deleteOne({ _id: blog._id });
-  
-      return res.status(200).json({ success: true, message: "Blog Deleted Successfully!" });
-    } catch (error) {
-      console.error("Error deleting blog:", error);
-      return res.status(500).json({ success: false, message: "Internal Server Error", error });
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
     }
   };
 
   exports.userBlogController = async (req, res) => {
     try {
-<<<<<<< HEAD
       // A user may only list their own blogs (Admin may list anyone's).
       if (String(req.params.id) !== String(req.user._id) && req.user.role !== "Admin") {
         return res.status(403).json({ success: false, message: "Not allowed." });
@@ -654,17 +445,10 @@ exports.updateBlogController = async (req, res) => {
       const user = await userModel.findById(req.params.id).select("username");
       if (!user) {
         return res.status(404).json({
-=======
-      const userBlog = await userModel.findById(req.params.id).populate("blogs");
-  
-      if (!userBlog) {
-        return res.status(404).send({
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
           success: false,
           message: "blogs not found with this id",
         });
       }
-<<<<<<< HEAD
       // The user's blogs are sourced from the Blog collection (blogModel.user
       // is the source of truth) rather than the removed denormalized
       // user.blogs array. The response shape ({ userBlog: { blogs } }) is
@@ -680,19 +464,6 @@ exports.updateBlogController = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "error in user blog",
-=======
-      return res.status(200).send({
-        success: true,
-        message: "user blogs",
-        userBlog,
-      });
-    } catch (error) {
-      console.log(error);
-      return res.status(400).send({
-        success: false,
-        message: "error in user blog",
-        error,
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
       });
     }
   };

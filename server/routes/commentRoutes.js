@@ -1,5 +1,4 @@
 const express = require("express");
-<<<<<<< HEAD
 const commentController = require("../controllers/commentController");
 const { authenticateUser, isAdmin } = require("../middleware/authMiddleware");
 const validate = require("../middleware/validate");
@@ -24,18 +23,3 @@ router.put("/:commentId", authenticateUser, commentController.updateComment);
 router.delete("/:commentId", authenticateUser, commentController.deleteComment);
 
 module.exports = router;
-=======
-const commentController = require("../controllers/commentController"); 
-
-const router = express.Router();
-
-router.post("/", commentController.createComment);
-router.get("/:blogId", commentController.getCommentsByBlog);
-router.put("/:commentId", commentController.updateComment);
-router.delete("/:commentId", commentController.deleteComment);
-router.post("/report", commentController.reportComment);
-router.get("/reported", commentController.getReportedComments); 
-router.post("/reply", commentController.addReply);
-
-module.exports = router;
->>>>>>> 94f0376a8509e9530791291eefaed4899f732725
