@@ -21,6 +21,7 @@ import GlassCard from "../components/GlassCard";
 import GradientButton from "../components/GradientButton";
 import UserAvatar from "../components/UserAvatar";
 import SectionHeading from "../components/SectionHeading";
+import LeaderboardCard, { LEVEL_BANDS } from "../components/LeaderboardCard";
 
 const Profile = () => {
   const user = useSelector(state => state.auth.user);
@@ -52,15 +53,8 @@ const Profile = () => {
   const [topWriters, setTopWriters] = useState([]);
   const [topReaders, setTopReaders] = useState([]);
 
-  // Level thresholds mirror the server's getLevel() so the progress bar is
-  // consistent with the displayed level. Each band knows its floor and the
-  // points needed to reach the next level; the top band has no "next".
-  const LEVEL_BANDS = [
-    { min: 0, next: 500 },
-    { min: 500, next: 1000 },
-    { min: 1000, next: 3000 },
-    { min: 3000, next: null },
-  ];
+  // Level thresholds are shared with the Leaderboard page via the
+  // LeaderboardCard module so there's one source of truth (see LEVEL_BANDS).
   const band = LEVEL_BANDS.find((b) => points >= b.min && (b.next === null || points < b.next)) || LEVEL_BANDS[LEVEL_BANDS.length - 1];
   const isMaxLevel = band.next === null;
   const nextLevelPoints = isMaxLevel ? points : band.next;
@@ -270,30 +264,6 @@ const Profile = () => {
     </ListItem>
   );
 
-  const LeaderboardCard = ({ title, emoji, rows }) => (
-    <GlassCard sx={{ p: 2, mt: 2 }}>
-      <Typography variant="subtitle2" sx={{ textAlign: "center", color: "primary.main", fontWeight: 700, mb: 1 }}>
-        {emoji} {title}
-      </Typography>
-      {rows.length > 0 ? (
-        rows.map((entry, index) => (
-          <ListItem key={entry._id} disableGutters sx={{ py: 0.25 }}>
-            <ListItemText
-              primary={`${index + 1}. ${entry.username}`}
-              secondary={`${entry.points} Points`}
-              primaryTypographyProps={{ variant: "body2" }}
-              secondaryTypographyProps={{ variant: "caption" }}
-            />
-          </ListItem>
-        ))
-      ) : (
-        <Typography variant="body2" sx={{ textAlign: "center", color: "text.secondary" }}>
-          No {title.toLowerCase()} yet.
-        </Typography>
-      )}
-    </GlassCard>
-  );
-
   return (
     <>
       <ToastContainer
@@ -322,8 +292,8 @@ const Profile = () => {
             {navItem("Leaderboard", <LeaderboardIcon fontSize="small" />, () => {})}
           </List>
 
-          <LeaderboardCard title="Top Writers" emoji="✍️" rows={topWriters} />
-          <LeaderboardCard title="Top Readers" emoji="📖" rows={topReaders} />
+          <LeaderboardCard title="Top Writers" emoji="✍️" rows={topWriters} currentUserId={user?._id} />
+          <LeaderboardCard title="Top Readers" emoji="📖" rows={topReaders} currentUserId={user?._id} />
 
           <List sx={{ mt: 2 }}>
             {navItem("Logout", <ExitToAppIcon fontSize="small" />, handleLogout)}

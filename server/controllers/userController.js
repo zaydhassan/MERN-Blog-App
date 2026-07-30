@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const userModel = require("../models/userModel");
 const bcrypt = require("bcryptjs");
 const Reward = require("../models/rewardModel");
+const PointEvent = require("../models/pointEventModel");
 const {
   publicUser,
   signAccessToken,
@@ -319,14 +320,63 @@ exports.redeemPoints = async (req, res) => {
 
 exports.getLeaderboard = async (req, res) => {
   try {
-    
-    const topWriters = await userModel.find({ role: "Writer", points: { $gt: 0 } }).sort({ points: -1 }).limit(10);
-    const topReaders = await userModel.find({ role: "Reader", points: { $gt: 0 } }).sort({ points: -1 }).limit(10);
+    const period = (req.query.period || "all").toLowerCase();
+    const valid = { all: "all", week: "week", month: "month" };
+    const periodKey = valid[period] || "all";
+
+    let topWriters, topReaders;
+
+    if (periodKey === "all") {
+      // All-time: read the denormalized points totals straight off the user
+      // docs (the compound {role, points} index serves this).
+      [topWriters, topReaders] = await Promise.all([
+        userModel.find({ role: "Writer", points: { $gt: 0 } }).sort({ points: -1 }).limit(10),
+        userModel.find({ role: "Reader", points: { $gt: 0 } }).sort({ points: -1 }).limit(10),
+      ]);
+    } else {
+      // Time-windowed: sum the append-only PointEvent ledger over the window,
+      // join the user for display fields, then split by role. Window starts:
+      // week = now−7d, month = now−30d.
+      const days = periodKey === "week" ? 7 : 30;
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+      const ranked = await PointEvent.aggregate([
+        { $match: { created_at: { $gte: since } } },
+        { $group: { _id: "$user", points: { $sum: "$points" } } },
+        { $match: { points: { $gt: 0 } } },
+        { $sort: { points: -1 } },
+        { $limit: 10 },
+        {
+          $lookup: {
+            from: "users",
+            localField: "_id",
+            foreignField: "_id",
+            as: "user",
+          },
+        },
+        { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            _id: 1,
+            points: 1,
+            username: "$user.username",
+            role: "$user.role",
+            profile_image: "$user.profile_image",
+            level: "$user.level",
+            badges: "$user.badges",
+          },
+        },
+      ]);
+
+      topWriters = ranked.filter((u) => u.role === "Writer");
+      topReaders = ranked.filter((u) => u.role === "Reader");
+    }
 
     res.json({
       success: true,
       topWriters,
       topReaders,
+      period: periodKey,
     });
   } catch (error) {
     console.error("Error fetching leaderboard:", error);

@@ -3,6 +3,10 @@ const User = require("../models/userModel");
 const Blog = require("../models/blogModel");
 const Comment = require("../models/commentModel");
 const Like = require("../models/likeModel");
+const Bookmark = require("../models/bookmarkModel");
+const Notification = require("../models/notificationModel");
+const PointEvent = require("../models/pointEventModel");
+const BlogView = require("../models/blogViewModel");
 const { publicUser } = require("../utils/tokenUtils");
 
 const getAllUsers = async (req, res) => {
@@ -40,11 +44,22 @@ const deleteUser = async (req, res) => {
       if (blogIds.length) {
         await Comment.deleteMany({ blog_id: { $in: blogIds } }).session(session);
         await Like.deleteMany({ blog_id: { $in: blogIds } }).session(session);
+        await Bookmark.deleteMany({ blog: { $in: blogIds } }).session(session);
+        await Notification.deleteMany({ blog: { $in: blogIds } }).session(session);
+        await BlogView.deleteMany({ blog_id: { $in: blogIds } }).session(session);
       }
       await Blog.deleteMany({ user: id }).session(session);
-      // Delete the user's own comments/likes elsewhere.
+      // Delete the user's own comments/likes/bookmarks/views elsewhere.
       await Comment.deleteMany({ user_id: id }).session(session);
       await Like.deleteMany({ user_id: id }).session(session);
+      await Bookmark.deleteMany({ user: id }).session(session);
+      await BlogView.deleteMany({ user_id: id }).session(session);
+      // Notifications where the deleted user was recipient or actor, and
+      // their point ledger (so time-windowed leaderboards drop them).
+      await Notification.deleteMany({
+        $or: [{ recipient: id }, { actor: id }],
+      }).session(session);
+      await PointEvent.deleteMany({ user: id }).session(session);
       await User.findByIdAndDelete(id).session(session);
     });
 

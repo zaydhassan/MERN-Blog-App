@@ -19,6 +19,9 @@ const userRoutes = require("./routes/userRoutes");
 const blogRoutes = require('./routes/blogRoutes');
 const commentRoutes = require('./routes/commentRoutes');
 const likeRoutes = require('./routes/likeRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const { router: bookmarkRoutes, readingHistoryRouter } = require('./routes/bookmarkRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
 const path = require('path');
 
 connectDB();
@@ -145,6 +148,10 @@ app.use("/api/v1/blog", blogRoutes);
 app.use("/api/v1/comments", commentRoutes);
 app.use("/api/v1/likes", likeRoutes);
 app.use("/api/v1/admin", adminRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/bookmarks", bookmarkRoutes);
+app.use("/api/v1/reading-history", readingHistoryRouter);
+app.use("/api/v1/analytics", analyticsRoutes);
 app.use(express.static(path.join(__dirname, "../client/build")));
 
 // SPA fallback. API routes that didn't match above should return JSON 404,

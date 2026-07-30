@@ -78,6 +78,12 @@ const promoteUserSchema = z.object({
   role: z.enum(["Reader", "Writer", "Admin"]),
 });
 
+// Bookmark toggle — only the blog id is client-supplied; the user comes from
+// auth middleware.
+const bookmarkSchema = z.object({
+  blog: z.string().regex(objectIdRegex, "Invalid blog id"),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -88,4 +94,5 @@ module.exports = {
   commentSchema,
   blogCreateSchema,
   promoteUserSchema,
+  bookmarkSchema,
 };

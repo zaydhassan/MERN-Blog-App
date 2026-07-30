@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import { Box, Button, InputLabel, TextField, Typography, Select, MenuItem, IconButton, Stack } from "@mui/material";
 import toast from "react-hot-toast";
 import 'quill/dist/quill.snow.css';
@@ -15,6 +16,8 @@ import { validateMinLength, validateRequired } from "../utils/validate";
 import GlassCard from "../components/GlassCard";
 import GradientButton from "../components/GradientButton";
 import SectionHeading from "../components/SectionHeading";
+import { celebrateAchievement } from "../components/Celebration";
+import { setGamification, fetchUnreadCount } from "../redux/store";
 
 const categories = ['Technology', 'Education', 'Health', 'Entertainment', 'Food', 'Business', 'Social Media', 'Travel', 'News'];
 
@@ -24,6 +27,7 @@ const stripHtml = (html) => (html || '').replace(/<\/?[^>]+(>|$)/g, '').trim();
 
 const CreateBlog = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   // Read auth from context (single source of truth) instead of localStorage.
   // The server identifies the author from the JWT (req.user._id), so we no
   // longer append a spoofable "user" field or send the legacy "user-id" header.
@@ -172,6 +176,13 @@ const handleBlogAction = async (status) => {
 
       if (response.data.success) {
         toast.success(`Blog ${status === 'Published' ? 'published' : 'saved as draft'}`, { icon: '👏' });
+        // Publishing awards points server-side; sync the store + celebrate any
+        // level-up / badge earned on publish. Drafts earn nothing.
+        if (status === 'Published' && response.data.points !== undefined) {
+          dispatch(setGamification({ points: response.data.points, level: response.data.level, badges: response.data.badges }));
+          celebrateAchievement({ leveledUp: response.data.leveledUp, newBadges: response.data.newBadges, level: response.data.level });
+          if (response.data.leveledUp || (response.data.newBadges && response.data.newBadges.length)) dispatch(fetchUnreadCount());
+        }
         navigate("/my-blogs");
       } else {
         throw new Error(`Failed to ${status.toLowerCase()} blog.`);

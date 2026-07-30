@@ -1,20 +1,26 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import {
   Box, Typography, IconButton, Badge, Drawer, TextField, Button,
-  Divider, CardMedia, Menu, MenuItem, Container, Stack, Chip, CircularProgress
+  Divider, Menu, MenuItem, Container, Stack, Chip, CircularProgress, Grid
 } from "@mui/material";
-import { Favorite, FavoriteBorder, Share, Comment, Edit, Delete, Report } from "@mui/icons-material";
+import { Favorite, FavoriteBorder, Share, Comment, Edit, Delete, Report, Bookmark, BookmarkBorder, AccessTime } from "@mui/icons-material";
 import toast from "react-hot-toast";
 import { useParams, useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import { useAuth } from "../context/AuthContext";
-import { sanitizeHtml } from "../utils/sanitize";
-import { onActivate } from "../utils/a11y";
+import { sanitizeHtml, readingTime } from "../utils/sanitize";
 import moment from "moment";
 import GlassCard from "../components/GlassCard";
 import GradientButton from "../components/GradientButton";
 import UserAvatar from "../components/UserAvatar";
 import SectionHeading from "../components/SectionHeading";
+import ReadingProgress from "../components/ReadingProgress";
+import TableOfContents from "../components/TableOfContents";
+import BlogGrid from "../components/BlogGrid";
+import BlogCard from "../components/BlogCard";
+import { celebrateAchievement } from "../components/Celebration";
+import { setGamification, fetchUnreadCount } from "../redux/store";
 import "./BlogDetails.css";
 
 const BlogDetails = () => {
@@ -22,12 +28,14 @@ const BlogDetails = () => {
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [bookmarked, setBookmarked] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [recommendations, setRecommendations] = useState([]);
   const [recsError, setRecsError] = useState(false);
   const [editingComment, setEditingComment] = useState({ id: null, text: "" });
@@ -41,6 +49,9 @@ const BlogDetails = () => {
   const COMMENTS_PER_PAGE = 5;
   const [commentPage, setCommentPage] = useState(1);
   const [commentHasMore, setCommentHasMore] = useState(false);
+  // Ref to the article body element — shared by ReadingProgress (scroll %) and
+  // TableOfContents (heading anchors + active-heading observer).
+  const contentRef = useRef(null);
 
   const fetchCommentsPage = async (page, append) => {
     try {
@@ -126,6 +137,20 @@ const BlogDetails = () => {
 
     fetchBlogDetails();
     fetchRecommendations();
+
+    // Seed the bookmark toggle's initial state from the user's saved ids so the
+    // icon reflects "already saved" without an extra per-blog request.
+    const fetchBookmarkState = async () => {
+      let currentUser = user || JSON.parse(localStorage.getItem("user") || "{}");
+      if (!currentUser || !currentUser._id) return;
+      try {
+        const { data } = await axios.get("/api/v1/bookmarks/ids");
+        if (data.success) setBookmarked((data.ids || []).includes(id));
+      } catch {
+        // non-critical — defaults to un-bookmarked
+      }
+    };
+    fetchBookmarkState();
   }, [id, user]);
 
   const handleLike = async () => {
@@ -140,6 +165,12 @@ const BlogDetails = () => {
         // Points are awarded atomically server-side inside the toggle endpoint,
         // so there is no separate (farmable) point call here.
         toast(data.liked ? "+5 Points! Liked the blog." : "-5 Points! Unliked the blog.", { icon: data.liked ? "👍" : "👎" });
+        // Sync gamification into the store + celebrate level-ups / new badges.
+        if (data.liked && data.points !== undefined) {
+          dispatch(setGamification({ points: data.points, level: data.level, badges: data.badges }));
+          celebrateAchievement({ leveledUp: data.leveledUp, newBadges: data.newBadges, level: data.level });
+          if (data.leveledUp || (data.newBadges && data.newBadges.length)) dispatch(fetchUnreadCount());
+        }
       }
       const likeResponse = await axios.get(`/api/v1/likes/${id}`);
       if (likeResponse.data.success) {
@@ -155,6 +186,24 @@ const BlogDetails = () => {
 
   const handleShareClick = (event) => setAnchorEl(event.currentTarget);
   const handleShareClose = () => setAnchorEl(null);
+
+  const handleBookmark = async () => {
+    let currentUser = user || JSON.parse(localStorage.getItem("user") || "{}");
+    if (!currentUser || !currentUser._id) { toast.error("Log in to save articles."); return; }
+    // Optimistic toggle so the icon flips instantly.
+    setBookmarked((prev) => !prev);
+    try {
+      const { data } = await axios.post("/api/v1/bookmarks/toggle", { blog: id });
+      if (data.success) {
+        setBookmarked(data.bookmarked);
+        toast.success(data.bookmarked ? "Saved to bookmarks." : "Removed from bookmarks.");
+      }
+    } catch {
+      // Revert on failure.
+      setBookmarked((prev) => !prev);
+      toast.error("Couldn't update bookmark.");
+    }
+  };
 
   const handleShare = (platform) => {
     if (!blog) return;
@@ -184,6 +233,13 @@ const BlogDetails = () => {
       if (response.status === 201) {
         toast.success("Comment added!");
         setNewComment("");
+        // The server returns the commenter's gamification delta — sync it and
+        // celebrate any level-up / new badge earned by commenting.
+        if (response.data && response.data.points !== undefined) {
+          dispatch(setGamification({ points: response.data.points, level: response.data.level, badges: response.data.badges }));
+          celebrateAchievement({ leveledUp: response.data.leveledUp, newBadges: response.data.newBadges, level: response.data.level });
+          if (response.data.leveledUp || (response.data.newBadges && response.data.newBadges.length)) dispatch(fetchUnreadCount());
+        }
         // Re-sync the loaded pages with the server. Under oldest-first ordering
         // the new comment lives on a later page, so it appears once the user
         // loads more — consistent with the existing threading.
@@ -262,6 +318,8 @@ const BlogDetails = () => {
   }
 
   return (
+    <>
+    <ReadingProgress contentRef={contentRef} />
     <Container maxWidth="lg" sx={{ py: { xs: 3, md: 5 } }}>
       {/* Cover */}
       <Box
@@ -277,6 +335,9 @@ const BlogDetails = () => {
         }}
       />
 
+      <Grid container spacing={3} alignItems="flex-start">
+        {/* Article */}
+        <Grid item xs={12} md={8.5}>
       <GlassCard sx={{ p: { xs: 3, md: 5 } }}>
         {/* Meta row */}
         <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2} sx={{ mb: 2 }}>
@@ -287,7 +348,10 @@ const BlogDetails = () => {
               <Typography variant="caption" sx={{ color: "text.secondary" }}>{moment(blog?.created_at).format("MMMM DD, YYYY")}</Typography>
             </Box>
           </Stack>
-          {blog?.category && <Chip label={blog.category} color="primary" variant="filled" />}
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Chip icon={<AccessTime />} label={`${readingTime(blog?.description)} min read`} variant="outlined" size="small" />
+            {blog?.category && <Chip label={blog.category} color="primary" variant="filled" />}
+          </Stack>
         </Stack>
 
         <Typography variant="h3" sx={{ mb: 3 }}>{blog?.title}</Typography>
@@ -301,6 +365,11 @@ const BlogDetails = () => {
             <Badge badgeContent={commentCount} color="primary"><Comment /></Badge>
           </IconButton>
           <IconButton onClick={handleShareClick} aria-label="Share"><Share /></IconButton>
+          {user && (
+            <IconButton onClick={handleBookmark} aria-label={bookmarked ? "Remove bookmark" : "Save bookmark"}>
+              {bookmarked ? <Bookmark color="primary" /> : <BookmarkBorder />}
+            </IconButton>
+          )}
           <Menu anchorEl={anchorEl} open={open} onClose={handleShareClose}>
             <MenuItem onClick={() => handleShare("twitter")}>Share on Twitter</MenuItem>
             <MenuItem onClick={() => handleShare("facebook")}>Share on Facebook</MenuItem>
@@ -311,12 +380,21 @@ const BlogDetails = () => {
 
         <Divider sx={{ mb: 3 }} />
 
-        {/* Article body — scoped prose styles in BlogDetails.css */}
+        {/* Article body — scoped prose styles in BlogDetails.css. The ref is
+            shared with ReadingProgress + TableOfContents. */}
         <Box
+          ref={contentRef}
           className="blog-content"
           dangerouslySetInnerHTML={{ __html: sanitizeHtml(blog?.description) }}
         />
       </GlassCard>
+        </Grid>
+
+        {/* Table of contents sidebar (desktop) / popover trigger (mobile) */}
+        <Grid item xs={12} md={3.5}>
+          <TableOfContents contentRef={contentRef} ready={!!blog} />
+        </Grid>
+      </Grid>
 
       {/* Recommendations */}
       {(recommendations.length > 0 || recsError) && (
@@ -325,29 +403,21 @@ const BlogDetails = () => {
           {recsError ? (
             <Typography variant="body2" sx={{ color: "text.secondary" }}>Couldn’t load recommendations.</Typography>
           ) : (
-            <GlassCard sx={{ p: 2, mt: 2 }}>
-              {recommendations.map((rec, index) => (
-                <Box
+            <BlogGrid sx={{ mt: 2, gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(3, 1fr)" } }}>
+              {recommendations.map((rec) => (
+                <BlogCard
                   key={rec._id}
-                  role="button"
-                  tabIndex={0}
-                  sx={{
-                    display: "flex", alignItems: "center", mb: 1.5, p: 1, borderRadius: 2, cursor: "pointer",
-                    transition: "background-color .2s ease", "&:hover": { backgroundColor: "action.hover" },
-                  }}
-                  onClick={() => navigate(`/blog-details/${rec._id}`)}
-                  onKeyDown={onActivate(() => navigate(`/blog-details/${rec._id}`))}
-                >
-                  <Typography variant="h5" sx={{ color: "primary.main", fontWeight: 800, mr: 2, minWidth: 34 }}>0{index + 1}</Typography>
-                  <UserAvatar src={rec.user?.profile_image} name={rec.user?.username} sx={{ width: 40, height: 40, mr: 2 }} />
-                  <Box flexGrow={1} sx={{ minWidth: 0 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rec.title}</Typography>
-                    <Typography variant="caption" sx={{ color: "text.secondary" }}>{rec.user?.username ?? "Unknown"} · {moment(rec.created_at).format("MMM DD")}</Typography>
-                  </Box>
-                  <CardMedia component="img" sx={{ width: 90, height: 56, borderRadius: 2, ml: 2 }} image={rec.image} alt={rec.title} />
-                </Box>
+                  id={rec._id}
+                  title={rec.title}
+                  description={rec.description}
+                  image={rec.image}
+                  username={rec.user?.username || "Unknown"}
+                  time={moment(rec.created_at).format("MMM DD, YYYY")}
+                  profileImage={rec.user?.profile_image}
+                  tags={Array.isArray(rec.tags) ? rec.tags.map((t) => t?.tag_name?.trim()).filter(Boolean) : []}
+                />
               ))}
-            </GlassCard>
+            </BlogGrid>
           )}
         </Box>
       )}
@@ -427,6 +497,7 @@ const BlogDetails = () => {
         </Box>
       </Drawer>
     </Container>
+    </>
   );
 };
 

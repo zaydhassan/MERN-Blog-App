@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import axios from "axios";
 import { Box, Button, InputLabel, TextField, Typography, Select, MenuItem, CircularProgress } from "@mui/material";
 import toast from "react-hot-toast";
@@ -9,12 +10,15 @@ import Quill from "quill";
 import GlassCard from "../components/GlassCard";
 import GradientButton from "../components/GradientButton";
 import SectionHeading from "../components/SectionHeading";
+import { celebrateAchievement } from "../components/Celebration";
+import { setGamification, fetchUnreadCount } from "../redux/store";
 
 const categories = ["Technology", "Education", "Health", "Entertainment", "Food", "Business", "Social Media", "Travel", "News"];
 
 const EditBlog = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const dispatch = useDispatch();
     const [inputs, setInputs] = useState({ title: "", description: "", category: "", image: "", tags: [] });
     const [uploadedImage, setUploadedImage] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -113,6 +117,13 @@ const EditBlog = () => {
 
             if (response.data.success) {
                 toast.success("Blog updated successfully!");
+                // A Draft→Published transition awards publish points server-side;
+                // sync the store + celebrate when the response carries a delta.
+                if (response.data.points !== undefined) {
+                    dispatch(setGamification({ points: response.data.points, level: response.data.level, badges: response.data.badges }));
+                    celebrateAchievement({ leveledUp: response.data.leveledUp, newBadges: response.data.newBadges, level: response.data.level });
+                    if (response.data.leveledUp || (response.data.newBadges && response.data.newBadges.length)) dispatch(fetchUnreadCount());
+                }
                 navigate("/my-blogs");
             } else {
                 throw new Error(response.data.message || "Failed to update blog");

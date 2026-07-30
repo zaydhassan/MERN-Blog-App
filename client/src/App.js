@@ -27,6 +27,11 @@ const About = lazy(() => import('./pages/About'));
 const Profile = lazy(() => import("./pages/Profile"));
 const Rewards = lazy(() => import("./pages/Rewards"));
 const EditBlog = lazy(() => import("./pages/EditBlog"));
+const Notifications = lazy(() => import("./pages/Notifications"));
+const Bookmarks = lazy(() => import("./pages/Bookmarks"));
+const ReadingHistory = lazy(() => import("./pages/ReadingHistory"));
+const Analytics = lazy(() => import("./pages/Analytics"));
+const Leaderboard = lazy(() => import("./pages/Leaderboard"));
 const AdminPanel = lazy(() => import("./admin/AdminPanel"));
 
 const PageFallback = () => (
@@ -68,6 +73,11 @@ function AppWrapper() {
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/category/:category" element={<Blogs />} />
                   <Route path="/rewards" element={<Rewards />} />
+                  <Route path="/notifications" element={<Notifications />} />
+                  <Route path="/bookmarks" element={<Bookmarks />} />
+                  <Route path="/reading-history" element={<ReadingHistory />} />
+                  <Route path="/analytics" element={<Analytics />} />
+                  <Route path="/leaderboard" element={<Leaderboard />} />
                   <Route path="/edit-blog/:id" element={<EditBlog />} />
                 </>
               )}

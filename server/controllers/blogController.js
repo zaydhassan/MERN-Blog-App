@@ -6,6 +6,8 @@ const BlogTag = require("../models/BlogTag");
 const Comment = require("../models/commentModel");
 const Like = require("../models/likeModel");
 const BlogView = require("../models/blogViewModel");
+const Bookmark = require("../models/bookmarkModel");
+const Notification = require("../models/notificationModel");
 const { awardActivity } = require("../utils/points");
 const { parsePagination, paginateMeta } = require("../utils/pagination");
 const { sanitizeHtml } = require("../utils/sanitize");
@@ -248,6 +250,7 @@ exports.createBlogController = async (req, res) => {
       });
 
       const session = await mongoose.startSession();
+      let publishDelta = null;
       try {
         session.startTransaction();
         await newBlog.save({ session });
@@ -260,7 +263,7 @@ exports.createBlogController = async (req, res) => {
         // blog is published immediately (Drafts earn nothing until published
         // via updateBlogController).
         if (finalStatus === "Published") {
-          await awardActivity(authorId, "publishArticle", 1, session);
+          publishDelta = await awardActivity(authorId, "publishArticle", 1, session);
         }
 
         await session.commitTransaction();
@@ -271,7 +274,16 @@ exports.createBlogController = async (req, res) => {
         session.endSession();
       }
 
-      return res.status(201).json({ success: true, message: "Blog Created!", newBlog });
+      return res.status(201).json({
+        success: true,
+        message: "Blog Created!",
+        newBlog,
+        points: publishDelta ? publishDelta.points : undefined,
+        level: publishDelta ? publishDelta.level : undefined,
+        badges: publishDelta ? publishDelta.badges : undefined,
+        leveledUp: publishDelta ? publishDelta.leveledUp : false,
+        newBadges: publishDelta ? publishDelta.newBadges : [],
+      });
     } catch (error) {
       console.error("Create blog error:", error.message);
       return res.status(400).json({ success: false, message: "Error while creating blog." });
@@ -310,18 +322,28 @@ exports.updateBlogController = async (req, res) => {
       // award fails, the status change rolls back too, so a "Published" blog
       // always has its points (and vice versa).
       const session = await mongoose.startSession();
+      let publishDelta = null;
       try {
         await session.withTransaction(async () => {
           await blog.save({ session });
           if (publishingNow) {
-            await awardActivity(req.user._id, "publishArticle", 1, session);
+            publishDelta = await awardActivity(req.user._id, "publishArticle", 1, session);
           }
         });
       } finally {
         session.endSession();
       }
 
-      return res.status(200).json({ success: true, message: "Blog Updated!", blog });
+      return res.status(200).json({
+        success: true,
+        message: "Blog Updated!",
+        blog,
+        points: publishDelta ? publishDelta.points : undefined,
+        level: publishDelta ? publishDelta.level : undefined,
+        badges: publishDelta ? publishDelta.badges : undefined,
+        leveledUp: publishDelta ? publishDelta.leveledUp : false,
+        newBadges: publishDelta ? publishDelta.newBadges : [],
+      });
   } catch (error) {
       console.error("Error updating blog:", error.message);
       return res.status(500).json({ success: false, message: "Error updating blog." });
@@ -416,13 +438,17 @@ exports.updateBlogController = async (req, res) => {
         return res.status(403).json({ success: false, message: "Not allowed to delete this blog." });
       }
 
-      // Cascade: remove the blog's comments and likes so we don't leave
-      // orphaned docs pointing at a deleted blog.
+      // Cascade: remove the blog's comments, likes, bookmarks and
+      // notifications so we don't leave orphaned docs pointing at a deleted
+      // blog. BlogView rows are cleaned up too (reading-history references).
       const session = await mongoose.startSession();
       try {
         await session.withTransaction(async () => {
           await Comment.deleteMany({ blog_id: blog._id }).session(session);
           await Like.deleteMany({ blog_id: blog._id }).session(session);
+          await Bookmark.deleteMany({ blog: blog._id }).session(session);
+          await Notification.deleteMany({ blog: blog._id }).session(session);
+          await BlogView.deleteMany({ blog_id: blog._id }).session(session);
           await blogModel.deleteOne({ _id: blog._id }).session(session);
         });
       } finally {

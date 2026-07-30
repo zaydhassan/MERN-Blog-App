@@ -16,3 +16,25 @@ export const sanitizeHtml = (dirty) => {
     FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "style"],
   });
 };
+
+/**
+ * Strip HTML tags from a rich-text string and return plain text — used to
+ * estimate reading time from a blog body without counting markup as words.
+ * Runs after sanitize so the input is already trusted-ish, but a regex strip
+ * is safe regardless (we never render the result as HTML).
+ */
+export const stripHtml = (html) => {
+  if (!html) return "";
+  return String(html)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&[a-z]+;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+/** Estimated reading time in minutes (200 wpm), minimum 1. */
+export const readingTime = (html) => {
+  const words = stripHtml(html).split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 200));
+};

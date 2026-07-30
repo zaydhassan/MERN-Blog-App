@@ -1,6 +1,7 @@
 const Comment = require("../models/commentModel");
 const blogModel = require("../models/blogModel");
 const { awardActivity } = require("../utils/points");
+const { createNotification } = require("../utils/notify");
 const { parsePagination, paginateMeta } = require("../utils/pagination");
 
 // Any authenticated user (Reader / Writer / Admin) may comment. The author is
@@ -27,12 +28,23 @@ exports.createComment = async (req, res) => {
     // separate endpoint): the commenter earns commentArticle points and the
     // blog's author earns receiveComment points. A failure here must not
     // block the comment from being returned — it only means the user keeps
-    // their previous point total.
+    // their previous point total. `commenterDelta` carries the level-up / new
+    // badge signal back to the client for the celebration UI.
+    let commenterDelta = null;
     try {
       const blog = await blogModel.findById(blog_id).select("user");
       if (blog) {
-        await awardActivity(user_id, "commentArticle", 1);
+        commenterDelta = await awardActivity(user_id, "commentArticle", 1);
         await awardActivity(blog.user, "receiveComment", 1);
+        // Notify the blog's author about the new comment (not on self-comment).
+        if (String(blog.user) !== String(user_id)) {
+          await createNotification({
+            recipient: blog.user,
+            actor: user_id,
+            type: "comment",
+            blog: blog._id,
+          });
+        }
       }
     } catch (awardErr) {
       console.error("Point award failed for comment:", awardErr.message);
@@ -41,7 +53,16 @@ exports.createComment = async (req, res) => {
     const populatedComment = await comment.populate("user_id", "_id username profile_image");
     const commentCount = await Comment.countDocuments({ blog_id });
 
-    res.status(201).json({ success: true, comment: populatedComment, commentCount });
+    res.status(201).json({
+      success: true,
+      comment: populatedComment,
+      commentCount,
+      points: commenterDelta ? commenterDelta.points : undefined,
+      level: commenterDelta ? commenterDelta.level : undefined,
+      badges: commenterDelta ? commenterDelta.badges : undefined,
+      leveledUp: commenterDelta ? commenterDelta.leveledUp : false,
+      newBadges: commenterDelta ? commenterDelta.newBadges : [],
+    });
   } catch (error) {
     console.error("Create comment error:", error.message);
     res.status(500).json({ success: false, message: "Failed to create comment." });
@@ -93,6 +114,20 @@ exports.addReply = async (req, res) => {
     }
     comment.replies.push({ user_id, content, created_at: new Date() });
     await comment.save();
+
+    // Notify the parent comment's author about the reply (not on self-reply).
+    if (String(comment.user_id) !== String(user_id)) {
+      try {
+        await createNotification({
+          recipient: comment.user_id,
+          actor: user_id,
+          type: "reply",
+          blog: comment.blog_id,
+        });
+      } catch (notifyErr) {
+        console.error("Reply notification failed:", notifyErr.message);
+      }
+    }
 
     const reply = comment.replies[comment.replies.length - 1];
     res.status(201).json({ success: true, reply });

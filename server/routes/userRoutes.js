@@ -35,8 +35,13 @@ router.post("/refresh", refreshTokenController);
 router.post("/logout", logoutController);
 
 // ---- Public read routes ----
+// Static segments MUST be registered before `/:id` or Express matches them as
+// `id = "all-users"` etc. (that was the old bug: /all-users was unreachable and
+// returned a 500 CastError). Keep every named route above `/:id`.
 router.get("/leaderboard", getLeaderboard);
 router.get("/rewards", listRewards);
+// Admin-only user listing — registered before `/:id` so it isn't shadowed.
+router.get("/all-users", authenticateUser, isAdmin, getAllUsers);
 router.get("/:id", getUserProfile);
 
 // ---- Authenticated routes ----
@@ -52,12 +57,6 @@ router.post(
   validateImageFile,
   uploadImage
 );
-
-// ---- Admin-only routes ----
-// Listing all users is sensitive: without auth it leaked every user (and,
-// before select:false, every password hash). Now it requires a valid Admin
-// token.
-router.get("/all-users", authenticateUser, isAdmin, getAllUsers);
 
 // ---- Authenticated self-service routes ----
 // Reward redemption acts on the *authenticated* user (the controller reads

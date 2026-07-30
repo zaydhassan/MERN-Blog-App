@@ -6,18 +6,21 @@ import { motion } from "framer-motion";
 import MenuIcon from "@mui/icons-material/Menu";
 import NightsStayIcon from "@mui/icons-material/NightsStay";
 import Brightness5Icon from "@mui/icons-material/Brightness5";
+import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
 import toast from "react-hot-toast";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import GradientButton from "./GradientButton";
 import UserAvatar from "./UserAvatar";
 import BrandLogo from "./BrandLogo";
-import { authActions } from "../redux/store";
+import NotificationBell from "./NotificationBell";
+import { authActions, fetchUnreadCount } from "../redux/store";
 
 const NAV_ITEMS = [
   { label: "Home", path: "/", match: (p) => p === "/" },
   { label: "About", path: "/about", match: (p) => p === "/about" },
   { label: "Blogs", path: "/blogs", match: (p) => p.startsWith("/blogs") || p.startsWith("/category") },
+  { label: "Leaderboard", path: "/leaderboard", match: (p) => p.startsWith("/leaderboard") },
   { label: "Contact", path: "/contact", match: (p) => p === "/contact" },
 ];
 
@@ -62,6 +65,16 @@ const Navbar = () => {
     setAnchorEl(null);
     setMobileOpen(false);
   }, [location]);
+
+  // Poll the unread-notification count for the bell badge while logged in:
+  // once on mount and every 60s. Clears the interval on logout/unmount so we
+  // never hit the authed endpoint as an anonymous user.
+  useEffect(() => {
+    if (!isLogin) return;
+    dispatch(fetchUnreadCount());
+    const id = setInterval(() => dispatch(fetchUnreadCount()), 60000);
+    return () => clearInterval(id);
+  }, [isLogin, dispatch]);
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
   const handleMenu = (event) => { event.stopPropagation(); setAnchorEl(event.currentTarget); };
@@ -190,6 +203,82 @@ const Navbar = () => {
                       </Button>
                     );
                   })}
+                  {isLogin && (
+                    <Button
+                      fullWidth
+                      sx={{
+                        justifyContent: "flex-start",
+                        textTransform: "none",
+                        fontWeight: location.pathname === "/notifications" ? 700 : 600,
+                        borderRadius: 2,
+                        px: 2,
+                        py: 1.25,
+                        color: location.pathname === "/notifications" ? "primary.main" : "text.secondary",
+                        backgroundColor: location.pathname === "/notifications" ? "brandSoft" : "transparent",
+                        "&:hover": { backgroundColor: "brandSoft", color: "primary.main" },
+                      }}
+                      onClick={() => { navigate("/notifications"); setMobileOpen(false); }}
+                    >
+                      Notifications
+                    </Button>
+                  )}
+                  {isLogin && (
+                    <Button
+                      fullWidth
+                      sx={{
+                        justifyContent: "flex-start",
+                        textTransform: "none",
+                        fontWeight: location.pathname === "/bookmarks" ? 700 : 600,
+                        borderRadius: 2,
+                        px: 2,
+                        py: 1.25,
+                        color: location.pathname === "/bookmarks" ? "primary.main" : "text.secondary",
+                        backgroundColor: location.pathname === "/bookmarks" ? "brandSoft" : "transparent",
+                        "&:hover": { backgroundColor: "brandSoft", color: "primary.main" },
+                      }}
+                      onClick={() => { navigate("/bookmarks"); setMobileOpen(false); }}
+                    >
+                      Bookmarks
+                    </Button>
+                  )}
+                  {isLogin && (
+                    <Button
+                      fullWidth
+                      sx={{
+                        justifyContent: "flex-start",
+                        textTransform: "none",
+                        fontWeight: location.pathname === "/reading-history" ? 700 : 600,
+                        borderRadius: 2,
+                        px: 2,
+                        py: 1.25,
+                        color: location.pathname === "/reading-history" ? "primary.main" : "text.secondary",
+                        backgroundColor: location.pathname === "/reading-history" ? "brandSoft" : "transparent",
+                        "&:hover": { backgroundColor: "brandSoft", color: "primary.main" },
+                      }}
+                      onClick={() => { navigate("/reading-history"); setMobileOpen(false); }}
+                    >
+                      Reading History
+                    </Button>
+                  )}
+                  {isLogin && (user?.role === "Writer" || user?.role === "Admin") && (
+                    <Button
+                      fullWidth
+                      sx={{
+                        justifyContent: "flex-start",
+                        textTransform: "none",
+                        fontWeight: location.pathname === "/analytics" ? 700 : 600,
+                        borderRadius: 2,
+                        px: 2,
+                        py: 1.25,
+                        color: location.pathname === "/analytics" ? "primary.main" : "text.secondary",
+                        backgroundColor: location.pathname === "/analytics" ? "brandSoft" : "transparent",
+                        "&:hover": { backgroundColor: "brandSoft", color: "primary.main" },
+                      }}
+                      onClick={() => { navigate("/analytics"); setMobileOpen(false); }}
+                    >
+                      Analytics
+                    </Button>
+                  )}
                 </Stack>
               </Box>
             </Drawer>
@@ -197,6 +286,15 @@ const Navbar = () => {
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
               {isLogin && (
                 <>
+                  <NotificationBell />
+                  <IconButton
+                    onClick={() => navigate("/bookmarks")}
+                    color="inherit"
+                    aria-label="Bookmarks"
+                    sx={{ borderRadius: 999, "&:hover": { backgroundColor: "action.hover" } }}
+                  >
+                    <BookmarkBorderIcon />
+                  </IconButton>
                   <IconButton
                     onClick={toggleTheme}
                     color="inherit"
@@ -220,6 +318,13 @@ const Navbar = () => {
                     slotProps={{ paper: { sx: { mt: 1.5, borderRadius: 3, overflow: "hidden" } } }}
                   >
                     <MenuItem onClick={() => { navigate("/profile"); handleClose(); }}>Profile</MenuItem>
+                    <MenuItem onClick={() => { navigate("/notifications"); handleClose(); }}>Notifications</MenuItem>
+                    <MenuItem onClick={() => { navigate("/bookmarks"); handleClose(); }}>Bookmarks</MenuItem>
+                    <MenuItem onClick={() => { navigate("/reading-history"); handleClose(); }}>Reading History</MenuItem>
+                    {(user?.role === "Writer" || user?.role === "Admin") && (
+                      <MenuItem onClick={() => { navigate("/analytics"); handleClose(); }}>Analytics</MenuItem>
+                    )}
+                    <MenuItem onClick={() => { navigate("/leaderboard"); handleClose(); }}>Leaderboard</MenuItem>
                     <MenuItem onClick={() => { handleNavigation("/my-blogs"); handleClose(); }}>My Blogs</MenuItem>
                     <MenuItem onClick={() => { handleNavigation("/create-blog"); handleClose(); }}>Create Blog</MenuItem>
                     <MenuItem onClick={handleLogout}>Logout</MenuItem>
