@@ -19,7 +19,7 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["like", "comment", "reply", "badge", "levelUp", "system"],
+      enum: ["like", "comment", "reply", "badge", "levelUp", "system", "scheduledPublished", "newPost", "follow"],
       required: true,
     },
     blog: {
@@ -43,6 +43,11 @@ const notificationSchema = new mongoose.Schema(
 notificationSchema.index({ recipient: 1, created_at: -1 });
 // Unread count query: `{ recipient, read: false }` → countDocuments.
 notificationSchema.index({ recipient: 1, read: 1 });
+// TTL: auto-delete notifications 90 days after creation. Notifications are
+// ephemeral UI state (a badge toast, a bell entry); without a TTL the
+// collection grows unbounded for every user forever. 90 days is enough history
+// for the notifications page without retaining stale data indefinitely.
+notificationSchema.index({ created_at: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
 
 const Notification =
   mongoose.models.Notification ||

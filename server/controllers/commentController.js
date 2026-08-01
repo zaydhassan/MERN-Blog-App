@@ -3,6 +3,7 @@ const blogModel = require("../models/blogModel");
 const { awardActivity } = require("../utils/points");
 const { createNotification } = require("../utils/notify");
 const { parsePagination, paginateMeta } = require("../utils/pagination");
+const { sanitizeHtml } = require("../utils/sanitize");
 
 // Any authenticated user (Reader / Writer / Admin) may comment. The author is
 // always taken from the verified token — never from the request body, which
@@ -18,26 +19,28 @@ exports.createComment = async (req, res) => {
   }
 
   try {
+    // Sanitize on write so stored comment markup is safe regardless of how the
+    // client renders it (defense in depth alongside the client-side sanitizer).
     const comment = await Comment.create({
-      content,
+      content: sanitizeHtml(content),
       blog_id,
       user_id,
     });
 
     // Best-effort point awarding (server-side, so it can't be farmed via a
     // separate endpoint): the commenter earns commentArticle points and the
-    // blog's author earns receiveComment points. A failure here must not
-    // block the comment from being returned — it only means the user keeps
-    // their previous point total. `commenterDelta` carries the level-up / new
-    // badge signal back to the client for the celebration UI.
+    // blog's author earns receiveComment points. The receiveComment award (and
+    // the author notification) are skipped on self-comment so an author can't
+    // farm points by commenting on their own post. A failure here must not
+    // block the comment from being returned. `commenterDelta` carries the
+    // level-up / new-badge signal back to the client for the celebration UI.
     let commenterDelta = null;
     try {
       const blog = await blogModel.findById(blog_id).select("user");
       if (blog) {
         commenterDelta = await awardActivity(user_id, "commentArticle", 1);
-        await awardActivity(blog.user, "receiveComment", 1);
-        // Notify the blog's author about the new comment (not on self-comment).
         if (String(blog.user) !== String(user_id)) {
+          await awardActivity(blog.user, "receiveComment", 1);
           await createNotification({
             recipient: blog.user,
             actor: user_id,
@@ -87,7 +90,7 @@ exports.updateComment = async (req, res) => {
       return res.status(403).json({ success: false, message: "Not allowed to edit this comment." });
     }
 
-    comment.content = content;
+    comment.content = sanitizeHtml(content);
     comment.updated_at = new Date();
     await comment.save();
 
@@ -112,7 +115,7 @@ exports.addReply = async (req, res) => {
     if (!comment) {
       return res.status(404).json({ success: false, message: "Comment not found." });
     }
-    comment.replies.push({ user_id, content, created_at: new Date() });
+    comment.replies.push({ user_id, content: sanitizeHtml(content), created_at: new Date() });
     await comment.save();
 
     // Notify the parent comment's author about the reply (not on self-reply).
@@ -129,8 +132,12 @@ exports.addReply = async (req, res) => {
       }
     }
 
-    const reply = comment.replies[comment.replies.length - 1];
-    res.status(201).json({ success: true, reply });
+    // Populate the reply author so the client can render it immediately — the
+    // raw subdoc only carries an ObjectId, which previously made replies show
+    // a blank username until a refetch.
+    await comment.populate("replies.user_id", "_id username profile_image");
+    const populatedReply = comment.replies[comment.replies.length - 1];
+    res.status(201).json({ success: true, reply: populatedReply });
   } catch (error) {
     console.error("Add reply error:", error.message);
     res.status(500).json({ success: false, message: "Failed to add reply." });
@@ -147,6 +154,21 @@ exports.deleteComment = async (req, res) => {
     }
     if (String(comment.user_id) !== String(req.user._id) && req.user.role !== "Admin") {
       return res.status(403).json({ success: false, message: "Not allowed to delete this comment." });
+    }
+
+    // Reverse the points that were awarded when this comment was created, so a
+    // create→delete→create cycle can't farm points. Best-effort: a reversal
+    // failure never blocks the delete (the comment is removed either way).
+    try {
+      const blog = await blogModel.findById(comment.blog_id).select("user");
+      if (blog) {
+        await awardActivity(comment.user_id, "commentArticle", -1);
+        if (String(blog.user) !== String(comment.user_id)) {
+          await awardActivity(blog.user, "receiveComment", -1);
+        }
+      }
+    } catch (revErr) {
+      console.error("Point reversal failed on comment delete:", revErr.message);
     }
 
     await Comment.deleteOne({ _id: comment._id });

@@ -91,10 +91,19 @@ const AboutPage = () => {
                 <GradientButton
                   size="large"
                   sx={{
-                    bgcolor: "transparent",
-                    color: "primary.main",
-                    border: (t) => `1px solid ${t.palette.primary.main}`,
-                    "&:hover": { bgcolor: "brandSoft" },
+                    bgcolor: "primary.main",
+                    backgroundImage: "none",
+                    color: "primary.contrastText",
+                    border: "1.5px solid",
+                    borderColor: "primary.main",
+                    fontWeight: 700,
+                    boxShadow: (t) => t.customShadows?.card,
+                    "&:hover": {
+                      bgcolor: "primary.dark",
+                      backgroundImage: "none",
+                      color: "primary.contrastText",
+                      boxShadow: (t) => t.customShadows?.cardHover,
+                    },
                   }}
                   onClick={() => navigate("/register")}
                 >

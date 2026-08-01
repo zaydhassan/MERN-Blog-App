@@ -1,0 +1,29 @@
+# ── Secrets / env (never commit real values) ──
+.env
+.env.*
+!.env.example
+
+# ── Dependencies ──
+node_modules/
+
+# ── Build output ──
+client/build/
+client/dist/
+dist/
+
+# ── Logs ──
+*.log
+npm-debug.log*
+
+# ── Editor / OS ──
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# ── Locally-uploaded files (ephemeral on PaaS; use CLOUDINARY_URL in prod) ──
+server/uploads/
+
+# ── Firebase service account (keep OUT of the repo) ──
+firebase-service-account.json
+*-serviceAccount*.json

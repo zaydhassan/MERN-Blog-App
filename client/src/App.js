@@ -2,12 +2,13 @@ import React, { lazy, Suspense } from 'react';
 import { CssBaseline, ThemeProvider as MuiThemeProvider, Box, CircularProgress } from '@mui/material';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { lightTheme, darkTheme } from './theme/theme';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import 'react-toastify/dist/ReactToastify.css';
+import ErrorBoundary from "./components/ErrorBoundary";
 
 // Route-level code-splitting: each page is loaded on demand via React.lazy so
 // the initial bundle only contains the shell (Navbar, providers, theme) + the
@@ -57,6 +58,7 @@ function AppWrapper() {
         <Toaster />
         <Box component="main" sx={{ flex: 1 }}>
           <Suspense fallback={<PageFallback />}>
+          <ErrorBoundary>
             <Routes>
             {!isAdmin && (
                 <>
@@ -90,6 +92,7 @@ function AppWrapper() {
 
               <Route path="*" element={<Navigate to={isAdmin ? "/admin" : "/"} />} />
             </Routes>
+          </ErrorBoundary>
           </Suspense>
         </Box>
         {!isAdminRoute && <Footer />}

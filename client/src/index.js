@@ -1,3 +1,9 @@
+// Polyfill regeneratorRuntime globally BEFORE any other module loads.
+// react-speech-recognition (imported by CreateBlog) is a Babel-compiled CJS
+// module that expects `regeneratorRuntime` as a global; Vite's esbuild
+// pre-bundling does not provide it, so without this import the lazy-loaded
+// CreateBlog route throws "regeneratorRuntime is not defined" on load.
+import 'regenerator-runtime/runtime';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';

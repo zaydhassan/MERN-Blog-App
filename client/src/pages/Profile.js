@@ -22,6 +22,7 @@ import GradientButton from "../components/GradientButton";
 import UserAvatar from "../components/UserAvatar";
 import SectionHeading from "../components/SectionHeading";
 import LeaderboardCard, { LEVEL_BANDS } from "../components/LeaderboardCard";
+import WritingStreakCard from "../components/WritingStreak";
 
 const Profile = () => {
   const user = useSelector(state => state.auth.user);
@@ -52,6 +53,7 @@ const Profile = () => {
   const [badges, setBadges] = useState([]);
   const [topWriters, setTopWriters] = useState([]);
   const [topReaders, setTopReaders] = useState([]);
+  const [followInfo, setFollowInfo] = useState({ followersCount: 0, followingCount: 0 });
 
   // Level thresholds are shared with the Leaderboard page via the
   // LeaderboardCard module so there's one source of truth (see LEVEL_BANDS).
@@ -148,6 +150,10 @@ const Profile = () => {
       fetchLeaderboard();
       setIsLoading(false);
       fetchRewards();
+      // Followers / following counts for the header card (best-effort).
+      axios.get(`/api/v1/follow/info/${user._id}`)
+        .then(({ data }) => data.success && setFollowInfo({ followersCount: data.followersCount, followingCount: data.followingCount }))
+        .catch(() => {});
     }
   }, [user, points, fetchUserStats, fetchLeaderboard]);
 
@@ -195,19 +201,21 @@ const Profile = () => {
         formData.append('image', selectedImage);
 
         try {
-          const imageResponse = await fetch(`/api/v1/user/upload-image`, {
-            method: 'POST',
-            body: formData,
-          });
-
-          const imageData = await imageResponse.json();
-          if (imageResponse.ok) {
+          // Use axios (not fetch) so the request interceptor attaches the
+          // Bearer access token and the 401-refresh-retry path applies. The
+          // old fetch() call sent no Authorization header → 401 every time.
+          const { data: imageData } = await axios.post(
+            '/api/v1/user/upload-image',
+            formData,
+            { headers: { "Content-Type": "multipart/form-data" } }
+          );
+          if (imageData?.success && imageData.imageUrl) {
             updatedData.profile_image = imageData.imageUrl;
           } else {
-            throw new Error(imageData.message || 'Image upload failed');
+            throw new Error(imageData?.message || 'Image upload failed');
           }
         } catch (error) {
-          toast.error('Failed to upload image');
+          toast.error(error?.response?.data?.message || 'Failed to upload image');
           return;
         }
       }
@@ -347,6 +355,11 @@ const Profile = () => {
               <Typography variant="caption" sx={{ mt: 1, display: "block", color: "text.secondary" }}>
                 {isMaxLevel ? "Max level reached 🏆" : `${progress.toFixed(1)}% to ${nextLevelPoints} points`}
               </Typography>
+
+              <Stack direction="row" spacing={1} justifyContent="center" sx={{ mt: 2 }}>
+                <Chip label={`${followInfo.followersCount} followers`} variant="outlined" size="small" />
+                <Chip label={`${followInfo.followingCount} following`} variant="outlined" size="small" />
+              </Stack>
             </GlassCard>
 
             {/* Badges */}
@@ -362,6 +375,11 @@ const Profile = () => {
                 <Typography variant="body2" sx={{ color: "text.secondary" }}>No badges yet. Keep engaging!</Typography>
               )}
             </Box>
+
+            {/* Writing streak + daily goal + contribution heatmap */}
+            <GlassCard sx={{ p: { xs: 3, md: 4 }, width: "100%" }}>
+              <WritingStreakCard />
+            </GlassCard>
 
             {/* Rewards */}
             <GlassCard sx={{ p: 3, width: "100%" }}>

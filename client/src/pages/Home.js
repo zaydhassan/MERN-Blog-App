@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Container, TextField, Typography, Skeleton, Stack } from '@mui/material';
 import { useNavigate, Link } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import axios from 'axios';
 import { validateEmail } from '../utils/validate';
 import BlogGrid from '../components/BlogGrid';
@@ -16,6 +17,7 @@ const HOME_BLOG_LIMIT = 6;
 
 const Home = () => {
   const navigate = useNavigate();
+  const isLogin = useSelector(state => state.auth.isLogin);
   const [email, setEmail] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -151,7 +153,7 @@ const Home = () => {
                 border: '1px solid rgba(255,255,255,0.55)',
                 '&:hover': { bgcolor: 'rgba(255,255,255,0.12)', borderColor: '#fff' },
               }}
-              onClick={() => navigate('/register')}
+              onClick={() => navigate(isLogin ? '/create-blog' : '/register')}
             >
               Start writing
             </GradientButton>
@@ -267,7 +269,7 @@ const Home = () => {
           ) : (
             <Box sx={{ gridColumn: '1 / -1', textAlign: 'center', py: 6 }}>
               <Typography color="text.secondary" sx={{ mb: 2 }}>No stories published yet — be the first to share one.</Typography>
-              <GradientButton onClick={() => navigate('/register')}>Start writing</GradientButton>
+              <GradientButton onClick={() => navigate(isLogin ? '/create-blog' : '/register')}>Start writing</GradientButton>
             </Box>
           )}
         </BlogGrid>

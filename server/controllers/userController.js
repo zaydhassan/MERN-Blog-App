@@ -10,20 +10,24 @@ const {
   verifyRefreshToken,
   refreshCookieOptions,
 } = require("../utils/tokenUtils");
+const { getLevel, getBadges } = require("../utils/points");
 
 // The multer configuration that used to live here is gone — uploads now go
 // through the shared, hardened config in ../config/upload (mounted on the
-// route). This controller only reads the already-validated req.file.
+// route). This controller only reads the already-validated req.file and
+// resolves its public URL via fileToUrl (works for both local disk and
+// Cloudinary — the old hand-built `${protocol}://${host}/uploads/<name>`
+// broke under Cloudinary, where the URL is a full CDN URL, not a local path).
+const { fileToUrl } = require("../config/upload");
 exports.uploadImage = (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, message: "No file uploaded" });
   }
 
-  const imageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
   return res.status(200).json({
     success: true,
     message: "Image uploaded successfully",
-    imageUrl,
+    imageUrl: fileToUrl(req.file),
   });
 };
 exports.registerController = async (req, res) => {
@@ -290,22 +294,49 @@ exports.redeemPoints = async (req, res) => {
       return res.status(404).json({ success: false, message: "Reward not found" });
     }
 
-    const user = await userModel.findById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
+    // Atomic conditional decrement — the `{ points: { $gte: cost } }` filter is
+    // the whole fix for the double-spend race the old read-check-save path had
+    // (two concurrent redeems each passed the check, each decremented, balance
+    // went negative). Only a doc that still has enough points at apply time is
+    // touched; a concurrent redeem that already dropped the balance below the
+    // cost matches zero docs and is rejected here.
+    const updated = await userModel.findOneAndUpdate(
+      { _id: userId, points: { $gte: reward.costInPoints } },
+      {
+        $inc: { points: -reward.costInPoints },
+        $push: { redeemedRewards: { rewardId: reward._id } },
+      },
+      { new: true }
+    );
 
-    if (user.points < reward.costInPoints) {
+    if (!updated) {
       return res.status(400).json({ success: false, message: "Not enough points" });
     }
 
-    user.points -= reward.costInPoints;
-    user.redeemedRewards.push({ rewardId: reward._id });
+    // Recompute derived level/badges from the new total (targeted $set — only
+    // those fields — so a concurrent award's points change isn't clobbered).
+    const level = getLevel(updated.points);
+    const badges = getBadges(updated.points);
+    await userModel.updateOne({ _id: updated._id }, { $set: { level, badges } });
 
-    await user.save();
-    res
-      .status(200)
-      .json({ success: true, message: "Reward redeemed successfully", pointsLeft: user.points });
+    // Best-effort audit ledger.
+    try {
+      await PointEvent.create({
+        user: userId,
+        activityType: "redeemReward",
+        points: -reward.costInPoints,
+      });
+    } catch (ledgerErr) {
+      console.error("Redemption ledger write failed:", ledgerErr.message);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Reward redeemed successfully",
+      pointsLeft: updated.points,
+      level,
+      badges,
+    });
   } catch (error) {
     console.error("Error redeeming points:", error.message);
     res.status(500).json({ success: false, message: "Error redeeming points" });

@@ -94,3 +94,15 @@
   border-top: 1px solid var(--divider);
   margin: 2em 0;
 }
+
+/* Paragraph being spoken by the "Listen to this blog" player. A left accent
+   bar + soft tint calls out where the voice is, and matches the blockquote
+   accent already used in the article body. */
+.blog-content .tts-active {
+  border-left: 4px solid var(--accent);
+  background: var(--accent-softer);
+  border-radius: 0 8px 8px 0;
+  padding-left: 0.8em;
+  margin-left: -0.8em;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}

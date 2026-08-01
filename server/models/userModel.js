@@ -69,6 +69,16 @@ const userSchema = new mongoose.Schema(
         }
       }
     ],
+    // Daily word-count goal for the writing streak feature (utils/writing.js).
+    // The author sets it from the Profile page; default 500 words/day. Clamped
+    // server-side on update (50–10000) so a junk value can't break the goal
+    // progress bar or award points repeatedly on a near-zero goal.
+    dailyGoal: {
+      type: Number,
+      default: 500,
+      min: 50,
+      max: 10000,
+    },
   },
   { timestamps: true,  collection: "users" }  
 );

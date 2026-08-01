@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { AppBar, Toolbar, IconButton, Button, MenuItem, Menu, Drawer, Box, Stack, Container } from "@mui/material";
+import { AppBar, Toolbar, IconButton, Button, MenuItem, Menu, Drawer, Box, Stack, Container, ListItemIcon, ListItemText, Divider } from "@mui/material";
 import { motion } from "framer-motion";
 import MenuIcon from "@mui/icons-material/Menu";
 import NightsStayIcon from "@mui/icons-material/NightsStay";
 import Brightness5Icon from "@mui/icons-material/Brightness5";
 import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import NotificationsIcon from "@mui/icons-material/Notifications";
+import HistoryIcon from "@mui/icons-material/History";
+import BarChartIcon from "@mui/icons-material/BarChart";
+import LeaderboardIcon from "@mui/icons-material/Leaderboard";
+import ArticleIcon from "@mui/icons-material/Article";
+import PostAddIcon from "@mui/icons-material/PostAdd";
+import LogoutIcon from "@mui/icons-material/Logout";
 import toast from "react-hot-toast";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
@@ -90,6 +98,19 @@ const Navbar = () => {
   };
 
   const handleNavigation = (path) => (isLogin ? navigate(path) : navigate("/login"));
+
+  // Profile dropdown items. Each carries its own icon; Analytics is
+  // writer/admin-only. Logout is rendered separately below a divider.
+  const menuItems = [
+    { icon: <AccountCircleIcon fontSize="small" />, label: "Profile", onClick: () => navigate("/profile") },
+    { icon: <NotificationsIcon fontSize="small" />, label: "Notifications", onClick: () => navigate("/notifications") },
+    { icon: <BookmarkBorderIcon fontSize="small" />, label: "Bookmarks", onClick: () => navigate("/bookmarks") },
+    { icon: <HistoryIcon fontSize="small" />, label: "Reading History", onClick: () => navigate("/reading-history") },
+    { icon: <BarChartIcon fontSize="small" />, label: "Analytics", onClick: () => navigate("/analytics"), show: user?.role === "Writer" || user?.role === "Admin" },
+    { icon: <LeaderboardIcon fontSize="small" />, label: "Leaderboard", onClick: () => navigate("/leaderboard") },
+    { icon: <ArticleIcon fontSize="small" />, label: "My Blogs", onClick: () => handleNavigation("/my-blogs") },
+    { icon: <PostAddIcon fontSize="small" />, label: "Create Blog", onClick: () => handleNavigation("/create-blog") },
+  ];
 
   return (
     <AppBar
@@ -315,19 +336,23 @@ const Navbar = () => {
                     anchorEl={anchorEl}
                     open={Boolean(anchorEl)}
                     onClose={handleClose}
-                    slotProps={{ paper: { sx: { mt: 1.5, borderRadius: 3, overflow: "hidden" } } }}
+                    slotProps={{ paper: { sx: { mt: 1.5, borderRadius: 3, overflow: "hidden", minWidth: 220 } } }}
                   >
-                    <MenuItem onClick={() => { navigate("/profile"); handleClose(); }}>Profile</MenuItem>
-                    <MenuItem onClick={() => { navigate("/notifications"); handleClose(); }}>Notifications</MenuItem>
-                    <MenuItem onClick={() => { navigate("/bookmarks"); handleClose(); }}>Bookmarks</MenuItem>
-                    <MenuItem onClick={() => { navigate("/reading-history"); handleClose(); }}>Reading History</MenuItem>
-                    {(user?.role === "Writer" || user?.role === "Admin") && (
-                      <MenuItem onClick={() => { navigate("/analytics"); handleClose(); }}>Analytics</MenuItem>
-                    )}
-                    <MenuItem onClick={() => { navigate("/leaderboard"); handleClose(); }}>Leaderboard</MenuItem>
-                    <MenuItem onClick={() => { handleNavigation("/my-blogs"); handleClose(); }}>My Blogs</MenuItem>
-                    <MenuItem onClick={() => { handleNavigation("/create-blog"); handleClose(); }}>Create Blog</MenuItem>
-                    <MenuItem onClick={handleLogout}>Logout</MenuItem>
+                    {menuItems.filter((item) => item.show !== false).map((item) => (
+                      <MenuItem
+                        key={item.label}
+                        onClick={() => { item.onClick(); handleClose(); }}
+                        sx={{ py: 1.25 }}
+                      >
+                        <ListItemIcon sx={{ color: "primary.main", minWidth: 36 }}>{item.icon}</ListItemIcon>
+                        <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: 600 }} />
+                      </MenuItem>
+                    ))}
+                    <Divider sx={{ my: 0.5 }} />
+                    <MenuItem onClick={handleLogout} sx={{ py: 1.25, color: "error.main" }}>
+                      <ListItemIcon sx={{ color: "error.main", minWidth: 36 }}><LogoutIcon fontSize="small" /></ListItemIcon>
+                      <ListItemText primary="Logout" primaryTypographyProps={{ fontWeight: 600 }} />
+                    </MenuItem>
                   </Menu>
                 </>
               )}

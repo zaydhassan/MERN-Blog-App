@@ -2,23 +2,27 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import {
   Box, Typography, IconButton, Badge, Drawer, TextField, Button,
-  Divider, Menu, MenuItem, Container, Stack, Chip, CircularProgress, Grid
+  Divider, Menu, MenuItem, Container, Stack, Chip, CircularProgress, Grid, Tooltip
 } from "@mui/material";
-import { Favorite, FavoriteBorder, Share, Comment, Edit, Delete, Report, Bookmark, BookmarkBorder, AccessTime } from "@mui/icons-material";
+import { Favorite, FavoriteBorder, Share, Comment, Edit, Delete, Report, Bookmark, BookmarkBorder, AccessTime, Headphones, Pause, PlayArrow, FileDownload } from "@mui/icons-material";
 import toast from "react-hot-toast";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { useAuth } from "../context/AuthContext";
 import { sanitizeHtml, readingTime } from "../utils/sanitize";
+import { downloadBlogAsPdf, downloadBlogAsMarkdown } from "../utils/exportBlog";
 import moment from "moment";
 import GlassCard from "../components/GlassCard";
 import GradientButton from "../components/GradientButton";
 import UserAvatar from "../components/UserAvatar";
+import FollowButton from "../components/FollowButton";
 import SectionHeading from "../components/SectionHeading";
 import ReadingProgress from "../components/ReadingProgress";
 import TableOfContents from "../components/TableOfContents";
 import BlogGrid from "../components/BlogGrid";
 import BlogCard from "../components/BlogCard";
+import ListenToBlogBar from "../components/ListenToBlogBar";
+import useTextToSpeech from "../hooks/useTextToSpeech";
 import { celebrateAchievement } from "../components/Celebration";
 import { setGamification, fetchUnreadCount } from "../redux/store";
 import "./BlogDetails.css";
@@ -52,6 +56,10 @@ const BlogDetails = () => {
   // Ref to the article body element — shared by ReadingProgress (scroll %) and
   // TableOfContents (heading anchors + active-heading observer).
   const contentRef = useRef(null);
+  const [downloadAnchor, setDownloadAnchor] = useState(null);
+  // "Listen to this blog" — browser SpeechSynthesis, driven from the same
+  // article body ref the reading-progress bar uses. No API key / per-call cost.
+  const tts = useTextToSpeech({ contentRef });
 
   const fetchCommentsPage = async (page, append) => {
     try {
@@ -123,12 +131,15 @@ const BlogDetails = () => {
 
     const fetchRecommendations = async () => {
       try {
-        // Fetch only a small page instead of the entire blog catalog. We grab
-        // a couple extra so we can drop the current blog and still fill 5.
-        const { data } = await axios.get("/api/v1/blog/all-blog?page=1&limit=8");
+        // Content-based related posts scored server-side by shared tags +
+        // category + title-keyword overlap (see getRelatedBlogs). This is
+        // genuinely "related to THIS article", not just "recent blogs".
+        const { data } = await axios.get(`/api/v1/blog/related/${id}?limit=5`);
         if (data.success) {
-          setRecommendations(data.blogs.filter((b) => b._id !== id).slice(0, 5));
+          setRecommendations(data.related || []);
           setRecsError(false);
+        } else {
+          setRecsError(true);
         }
       } catch (error) {
         setRecsError(true);
@@ -346,6 +357,9 @@ const BlogDetails = () => {
             <Box>
               <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{blog?.user?.username || "Unknown Author"}</Typography>
               <Typography variant="caption" sx={{ color: "text.secondary" }}>{moment(blog?.created_at).format("MMMM DD, YYYY")}</Typography>
+              <Box sx={{ mt: 0.75 }}>
+                <FollowButton userId={blog?.user?._id} />
+              </Box>
             </Box>
           </Stack>
           <Stack direction="row" spacing={1} alignItems="center">
@@ -365,11 +379,59 @@ const BlogDetails = () => {
             <Badge badgeContent={commentCount} color="primary"><Comment /></Badge>
           </IconButton>
           <IconButton onClick={handleShareClick} aria-label="Share"><Share /></IconButton>
+          {tts.supported && (
+            <Tooltip title={tts.speaking && !tts.paused ? "Pause narration" : tts.paused ? "Resume narration" : "Listen to this blog"}>
+              <IconButton
+                onClick={tts.toggle}
+                color={tts.speaking || tts.paused ? "primary" : "default"}
+                aria-label={tts.speaking && !tts.paused ? "Pause narration" : "Listen to this blog"}
+              >
+                {tts.speaking && !tts.paused ? <Pause /> : tts.paused ? <PlayArrow /> : <Headphones />}
+              </IconButton>
+            </Tooltip>
+          )}
           {user && (
             <IconButton onClick={handleBookmark} aria-label={bookmarked ? "Remove bookmark" : "Save bookmark"}>
               {bookmarked ? <Bookmark color="primary" /> : <BookmarkBorder />}
             </IconButton>
           )}
+          <Tooltip title="Download">
+            <IconButton onClick={(e) => setDownloadAnchor(e.currentTarget)} aria-label="Download">
+              <FileDownload />
+            </IconButton>
+          </Tooltip>
+          <Menu
+            anchorEl={downloadAnchor}
+            open={Boolean(downloadAnchor)}
+            onClose={() => setDownloadAnchor(null)}
+          >
+            <MenuItem
+              onClick={async () => {
+                setDownloadAnchor(null);
+                try {
+                  await downloadBlogAsPdf(contentRef.current, blog);
+                  toast.success("PDF downloaded.");
+                } catch (err) {
+                  toast.error(err?.message || "Couldn't export PDF.");
+                }
+              }}
+            >
+              Download as PDF
+            </MenuItem>
+            <MenuItem
+              onClick={async () => {
+                setDownloadAnchor(null);
+                try {
+                  await downloadBlogAsMarkdown(blog);
+                  toast.success("Markdown downloaded.");
+                } catch (err) {
+                  toast.error(err?.message || "Couldn't export Markdown.");
+                }
+              }}
+            >
+              Download as Markdown
+            </MenuItem>
+          </Menu>
           <Menu anchorEl={anchorEl} open={open} onClose={handleShareClose}>
             <MenuItem onClick={() => handleShare("twitter")}>Share on Twitter</MenuItem>
             <MenuItem onClick={() => handleShare("facebook")}>Share on Facebook</MenuItem>
@@ -399,7 +461,7 @@ const BlogDetails = () => {
       {/* Recommendations */}
       {(recommendations.length > 0 || recsError) && (
         <Box sx={{ mt: 6 }}>
-          <SectionHeading eyebrow="Keep reading" title="Recommended for you" badge />
+          <SectionHeading eyebrow="Keep reading" title="Related reads" badge />
           {recsError ? (
             <Typography variant="body2" sx={{ color: "text.secondary" }}>Couldn’t load recommendations.</Typography>
           ) : (
@@ -497,6 +559,26 @@ const BlogDetails = () => {
         </Box>
       </Drawer>
     </Container>
+
+      {/* Text-to-speech player bar — only mounts while a session is active so
+          it never shows on a fresh page load. */}
+      {tts.supported && (tts.speaking || tts.paused) && (
+        <ListenToBlogBar
+          contentRef={contentRef}
+          title={blog?.title}
+          speaking={tts.speaking}
+          paused={tts.paused}
+          rate={tts.rate}
+          setRate={tts.setRate}
+          currentChunk={tts.currentChunk}
+          totalChunks={tts.totalChunks}
+          currentText={tts.currentText}
+          onToggle={tts.toggle}
+          onStop={tts.stop}
+          onNext={tts.next}
+          onPrev={tts.prev}
+        />
+      )}
     </>
   );
 };

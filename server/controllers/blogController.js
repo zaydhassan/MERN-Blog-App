@@ -9,8 +9,13 @@ const BlogView = require("../models/blogViewModel");
 const Bookmark = require("../models/bookmarkModel");
 const Notification = require("../models/notificationModel");
 const { awardActivity } = require("../utils/points");
+const { createNotification } = require("../utils/notify");
+const BlogRevision = require("../models/blogRevisionModel");
 const { parsePagination, paginateMeta } = require("../utils/pagination");
 const { sanitizeHtml } = require("../utils/sanitize");
+const { recordWords, countWords } = require("../utils/writing");
+const { notifyFollowersOfNewPost } = require("../utils/followNotify");
+const { fileToUrl } = require("../config/upload");
 
 // Trending is now computed from the REAL like / comment collections via
 // $lookup, instead of sorting by the denormalized blog.likes / blog.comments
@@ -92,6 +97,93 @@ exports.getRecommendedBlogs = async (req, res) => {
   } catch (error) {
     console.error("Error fetching recommended blogs:", error.message);
     res.status(500).json({ success: false, message: "Error fetching recommended blogs." });
+  }
+};
+
+// Tiny stopword list so title overlap counts meaningful words, not "the/a/and".
+const TITLE_STOPWORDS = new Set([
+  "the", "a", "an", "and", "or", "but", "of", "to", "in", "on", "for", "with",
+  "is", "are", "at", "by", "from", "this", "that", "it", "as", "be", "your",
+  "you", "how", "why", "what", "when", "into",
+]);
+
+// Tokenize a title into a Set of significant lowercase words (length >= 3,
+// stopwords dropped). Used for lightweight title-keyword overlap scoring.
+const titleTokens = (title) => {
+  if (!title) return new Set();
+  return new Set(
+    String(title)
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length >= 3 && !TITLE_STOPWORDS.has(w))
+  );
+};
+
+// Content-based "related posts" for the blog reader: score every published
+// blog (except the current one) by shared tags (most important), same
+// category, and title-keyword overlap, then return the top N. Unlike the
+// existing getRecommendedBlogs (which is user-personalized by engagement),
+// this is purely about the article itself, so it works for anonymous readers
+// too. The catalog is small for a personal blog app, so in-memory scoring over
+// a bounded recent window is plenty fast and avoids an aggregation pipeline.
+exports.getRelatedBlogs = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid blog ID." });
+    }
+
+    const limit = Math.min(Number(req.query.limit) || 5, 10);
+
+    const current = await blogModel.findById(id).populate("tags", "tag_name").lean();
+    if (!current) {
+      return res.status(404).json({ success: false, message: "Blog not found." });
+    }
+
+    const currentTagIds = new Set((current.tags || []).map((t) => String(t._id)));
+    const currentTokens = titleTokens(current.title);
+    const currentCategory = current.category;
+
+    // Bounded candidate window: recent published blogs (excluding the current
+    // one). 500 is far more than a personal blog will have and keeps scoring
+    // cheap; raising it wouldn't change results meaningfully.
+    const candidates = await blogModel
+      .find({ status: "Published", _id: { $ne: id } })
+      .sort({ created_at: -1 })
+      .limit(500)
+      .populate("user", "username profile_image")
+      .populate("tags", "tag_name")
+      .lean();
+
+    const scored = candidates.map((b) => {
+      let score = 0;
+      // Shared tags carry the most weight — they're the author's own signal of
+      // topical relevance.
+      for (const t of b.tags || []) {
+        if (currentTagIds.has(String(t._id))) score += 3;
+      }
+      if (currentCategory && b.category === currentCategory) score += 2;
+      // Title keyword overlap is a weak tiebreaker for posts that share neither
+      // tags nor category but are topically similar (e.g. "React hooks" vs
+      // "Understanding React effects").
+      if (currentTokens.size) {
+        const tokens = titleTokens(b.title);
+        let overlap = 0;
+        for (const w of tokens) if (currentTokens.has(w)) overlap++;
+        score += overlap;
+      }
+      return { blog: b, score };
+    });
+
+    // Highest score first; break ties by recency (newer wins) so a stale post
+    // with a coincidental tag match doesn't outrank fresh, on-topic content.
+    scored.sort((a, b) => b.score - a.score || (b.blog.created_at || 0) - (a.blog.created_at || 0));
+    const related = scored.slice(0, limit).map((s) => s.blog);
+
+    return res.status(200).json({ success: true, related });
+  } catch (error) {
+    console.error("Error fetching related blogs:", error.message);
+    return res.status(500).json({ success: false, message: "Error fetching related blogs." });
   }
 };
 
@@ -221,7 +313,12 @@ const resolveTagIds = async (tags) => {
 
 exports.createBlogController = async (req, res) => {
     try {
-      const uploadedImage = req.file ? `/uploads/${req.file.filename}` : req.body.image;
+      // Cover image: an uploaded file wins; otherwise fall back to a client
+      // pasted URL. fileToUrl handles both local disk and Cloudinary, and the
+      // /schemas blogCreateSchema regex-validates that any pasted URL is an
+      // http(s) URL — so neither a `javascript:`/`data:` URL nor a relative
+      // path can reach the DB here.
+      const uploadedImage = req.file ? fileToUrl(req.file) : req.body.image;
       const { title, category, tags, status = "Draft" } = req.body;
       // Sanitize rich text on write so stored XSS markup never reaches the DB.
       const description = sanitizeHtml(req.body.description);
@@ -235,8 +332,20 @@ exports.createBlogController = async (req, res) => {
         return res.status(400).json({ success: false, message: "Image file is required." });
       }
 
+      // Scheduled publish: a future `publishAt` means "hold this as a draft
+      // and auto-publish at the given time." Stored as a Draft so it never
+      // appears in public listings until promoted; earns no points up front
+      // (the promotion sweep awards them when it goes live). A past/invalid
+      // publishAt is rejected — use Publish instead.
+      const publishAt = req.body.publishAt ? new Date(req.body.publishAt) : null;
+      const isScheduled =
+        publishAt && !Number.isNaN(publishAt.getTime()) && publishAt.getTime() > Date.now();
+      if (req.body.publishAt && !isScheduled) {
+        return res.status(400).json({ success: false, message: "Scheduled time must be a valid future date." });
+      }
+
       const tagIds = await resolveTagIds(tags);
-      const finalStatus = status || "Draft";
+      const finalStatus = isScheduled ? "Draft" : (status || "Draft");
 
       const newBlog = new blogModel({
         title,
@@ -246,6 +355,7 @@ exports.createBlogController = async (req, res) => {
         tags: tagIds,
         user: authorId,
         status: finalStatus,
+        publishAt: isScheduled ? publishAt : null,
         views: 0,
       });
 
@@ -260,8 +370,8 @@ exports.createBlogController = async (req, res) => {
           })
         );
         // Award publish points atomically with the blog creation when the
-        // blog is published immediately (Drafts earn nothing until published
-        // via updateBlogController).
+        // blog is published immediately. Scheduled posts (Drafts) earn nothing
+        // now — the promotion sweep awards them when the post goes live.
         if (finalStatus === "Published") {
           publishDelta = await awardActivity(authorId, "publishArticle", 1, session);
         }
@@ -274,10 +384,23 @@ exports.createBlogController = async (req, res) => {
         session.endSession();
       }
 
+      // Credit the author's daily writing ledger (streak + word-count goal).
+      // Fire-and-forget after the commit so a ledger hiccup never blocks the
+      // create. Counted once on creation; updates credit only the net delta.
+      recordWords(authorId, countWords(title, description)).catch(() => {});
+
+      // Alert the author's followers (in-app notification + email) only when
+      // the post actually goes live now. Scheduled posts defer this to the
+      // promotion sweep. Fire-and-forget after the commit.
+      if (finalStatus === "Published") {
+        notifyFollowersOfNewPost(authorId, newBlog).catch(() => {});
+      }
+
       return res.status(201).json({
         success: true,
-        message: "Blog Created!",
+        message: isScheduled ? "Blog scheduled!" : "Blog Created!",
         newBlog,
+        scheduled: isScheduled,
         points: publishDelta ? publishDelta.points : undefined,
         level: publishDelta ? publishDelta.level : undefined,
         badges: publishDelta ? publishDelta.badges : undefined,
@@ -294,6 +417,29 @@ exports.updateBlogController = async (req, res) => {
   try {
       const { id } = req.params;
       const { title, description, image, status, category, tags } = req.body;
+      // Prefer a freshly uploaded file (parsed by multer) over a body-supplied
+      // image URL; without this, an uploaded image on update was silently
+      // dropped because the controller only read req.body.image. fileToUrl
+      // resolves the URL for either local disk or Cloudinary. The blogUpdate
+      // schema regex-validates any pasted URL is http(s) — no javascript:/
+      // data:/relative-path can reach the DB.
+      const uploadedImage = req.file ? fileToUrl(req.file) : image;
+      // publishAt handling: an empty/null value clears any existing schedule.
+      // A future date schedules the post (forces Draft if it isn't already, so
+      // a scheduled post stays hidden until promoted). A past/invalid date is
+      // rejected. "Publish now" is just status: "Published" + no publishAt,
+      // handled by the existing publishingNow path below (which also clears
+      // publishAt so an immediately-published post isn't later re-promoted).
+      let publishAt = null;
+      if (req.body.publishAt !== undefined && req.body.publishAt !== "" && req.body.publishAt !== null) {
+        publishAt = new Date(req.body.publishAt);
+        if (Number.isNaN(publishAt.getTime())) {
+          return res.status(400).json({ success: false, message: "Scheduled time must be a valid date." });
+        }
+        if (publishAt.getTime() <= Date.now()) {
+          return res.status(400).json({ success: false, message: "Scheduled time must be in the future." });
+        }
+      }
 
       const blog = await blogModel.findById(id);
       if (!blog) {
@@ -304,17 +450,44 @@ exports.updateBlogController = async (req, res) => {
           return res.status(403).json({ success: false, message: "Not allowed to edit this blog." });
       }
 
+      // Capture the PREVIOUS content (before any mutation below) so we can write
+      // an "Auto" revision of it inside the save transaction — giving the writer
+      // a one-click rollback to before-this-edit. Tags need their names, so
+      // resolve them from the stored ObjectIds (the doc isn't populated here).
+      const previousTitle = blog.title;
+      const previousDescription = blog.description;
+      const previousCategory = blog.category;
+      let previousTagNames = [];
+      if (Array.isArray(blog.tags) && blog.tags.length) {
+        const prevTags = await Tag.find({ _id: { $in: blog.tags } }).select("tag_name -_id").lean();
+        previousTagNames = prevTags.map((t) => t.tag_name);
+      }
+      // Word count of the PREVIOUS content, so the writing ledger only credits
+      // NET new words on an edit (max(0, new - prev)) — re-saving an unchanged
+      // post never inflates the streak/goal.
+      const previousWords = countWords(previousTitle, previousDescription);
+
       if (title !== undefined) blog.title = title;
       if (description !== undefined) blog.description = sanitizeHtml(description);
-      if (image !== undefined) blog.image = image;
-      // Award publish points the first time a blog transitions to Published
-      // (Draft/Archived -> Published). Re-publishing an already-Published
-      // blog earns nothing, so a user can't farm points by toggling status.
+      if (uploadedImage !== undefined && uploadedImage !== "") blog.image = uploadedImage;
+      // A future publishAt => schedule: force Draft (hide until promoted) and
+      // never award points here. Otherwise: honor status, clear any prior
+      // schedule on explicit unschedule/publish-now so the sweep doesn't
+      // re-touch it. publishAt omitted entirely preserves an existing schedule.
+      const scheduling = publishAt !== null;
       const publishingNow =
+        !scheduling &&
         status !== undefined &&
         status === "Published" &&
         blog.status !== "Published";
-      if (status !== undefined) blog.status = status;
+      if (scheduling) {
+        blog.publishAt = publishAt;
+        blog.status = "Draft";
+      } else {
+        if (req.body.publishAt !== undefined) blog.publishAt = null; // explicit unschedule
+        if (status !== undefined) blog.status = status;
+        if (publishingNow) blog.publishAt = null; // publish-now wins over a prior schedule
+      }
       if (category !== undefined) blog.category = category;
       if (tags !== undefined) blog.tags = await resolveTagIds(tags);
 
@@ -329,15 +502,46 @@ exports.updateBlogController = async (req, res) => {
           if (publishingNow) {
             publishDelta = await awardActivity(req.user._id, "publishArticle", 1, session);
           }
+          // Auto-snapshot of the PREVIOUS content, so the writer can roll back
+          // to before this edit. Atomic with the update: if the save rolls back,
+          // no orphan revision is left behind. Skipped only if the post had no
+          // title previously (shouldn't happen for an existing blog).
+          if (previousTitle) {
+            await BlogRevision.create(
+              [{
+                blog: blog._id,
+                author: req.user._id,
+                title: previousTitle,
+                description: previousDescription,
+                category: previousCategory,
+                tags: previousTagNames,
+                label: "Auto",
+              }],
+              { session }
+            );
+          }
         });
       } finally {
         session.endSession();
       }
 
+      // Credit only net-new words to the daily writing ledger (streak + goal).
+      // Fire-and-forget after the commit; never blocks the update response.
+      const newWords = countWords(blog.title, blog.description);
+      const delta = Math.max(0, newWords - previousWords);
+      if (delta > 0) recordWords(req.user._id, delta).catch(() => {});
+
+      // A Draft→Published transition is a real publish: alert the author's
+      // followers. Fire-and-forget after the commit.
+      if (publishingNow) {
+        notifyFollowersOfNewPost(req.user._id, blog).catch(() => {});
+      }
+
       return res.status(200).json({
         success: true,
-        message: "Blog Updated!",
+        message: scheduling ? "Blog scheduled!" : "Blog Updated!",
         blog,
+        scheduled: scheduling,
         points: publishDelta ? publishDelta.points : undefined,
         level: publishDelta ? publishDelta.level : undefined,
         badges: publishDelta ? publishDelta.badges : undefined,
@@ -374,11 +578,13 @@ exports.updateBlogController = async (req, res) => {
         return res.status(400).json({ success: false, message: "Invalid blog ID." });
       }
 
-      // Count the view (every fetch, anonymous or not) so trending's `views`
-      // sort actually reflects traffic. Use `$inc` on the doc rather than a
-      // read-modify-write so concurrent views don't lose increments.
+      // Fetch WITHOUT incrementing views yet. We must gate visibility first:
+      // a non-Published blog is only visible to its author (or an Admin).
+      // Previously this incremented views and returned the blog unconditionally,
+      // so any logged-in user could read someone else's Draft/Scheduled post by
+      // its ID (an IDOR) — and that fetch also bumped the draft's view count.
       const blog = await blogModel
-        .findByIdAndUpdate(id, { $inc: { views: 1 } }, { new: true })
+        .findById(id)
         .populate("user", "username profile_image");
 
       if (!blog) {
@@ -387,6 +593,25 @@ exports.updateBlogController = async (req, res) => {
           message: "Blog not found with this ID.",
         });
       }
+
+      const isOwner = req.user && String(req.user._id) === String(blog.user._id || blog.user);
+      const isAuthorized = isOwner || req.user?.role === "Admin";
+
+      // Hide non-published blogs from everyone but the author/Admin. Return 404
+      // (not 403) so the existence of a private/draft post isn't leaked.
+      if (blog.status !== "Published" && !isAuthorized) {
+        return res.status(404).json({
+          success: false,
+          message: "Blog not found with this ID.",
+        });
+      }
+
+      // Now that the caller is allowed to see it, count the view. Use `$inc` so
+      // concurrent views don't lose increments. Draft/scheduled views by the
+      // author are still counted (harmless, and useful for the author's own
+      // analytics).
+      await blogModel.updateOne({ _id: id }, { $inc: { views: 1 } });
+      blog.views = (blog.views || 0) + 1;
 
       // For an authenticated reader, award `readArticle` points once per blog
       // (deduped by the BlogView unique index). Anonymous fetches skip this.
@@ -438,9 +663,10 @@ exports.updateBlogController = async (req, res) => {
         return res.status(403).json({ success: false, message: "Not allowed to delete this blog." });
       }
 
-      // Cascade: remove the blog's comments, likes, bookmarks and
-      // notifications so we don't leave orphaned docs pointing at a deleted
-      // blog. BlogView rows are cleaned up too (reading-history references).
+      // Cascade: remove the blog's comments, likes, bookmarks, notifications,
+      // view rows, revision history and tag links so we don't leave orphaned
+      // docs pointing at a deleted blog. (BlogRevision + BlogTag were missing
+      // from this cascade — they leaked revisions and stale tag-join rows.)
       const session = await mongoose.startSession();
       try {
         await session.withTransaction(async () => {
@@ -449,6 +675,8 @@ exports.updateBlogController = async (req, res) => {
           await Bookmark.deleteMany({ blog: blog._id }).session(session);
           await Notification.deleteMany({ blog: blog._id }).session(session);
           await BlogView.deleteMany({ blog_id: blog._id }).session(session);
+          await BlogRevision.deleteMany({ blog: blog._id }).session(session);
+          await BlogTag.deleteMany({ blog_id: blog._id }).session(session);
           await blogModel.deleteOne({ _id: blog._id }).session(session);
         });
       } finally {
@@ -493,3 +721,73 @@ exports.updateBlogController = async (req, res) => {
       });
     }
   };
+
+// Scheduled-publish promotion sweep. Flips any "Draft" whose `publishAt` has
+// passed to "Published", awarding the same publish points an immediate
+// publish earns and notifying the author. Each promotion is an atomic
+// conditional updateOne filtered by `status: "Draft"` — so even with multiple
+// server instances running the sweep, exactly one instance wins the flip
+// (modifiedCount === 1) and awards points + notifies; the others match zero
+// docs and do nothing. No double-award, no double follower email. Each post
+// runs in its own transaction so one failure never blocks the others.
+exports.promoteScheduledBlogs = async () => {
+  try {
+    const due = await blogModel.find({
+      status: "Draft",
+      publishAt: { $ne: null, $lte: new Date() },
+    });
+
+    if (!due.length) return 0;
+
+    let promoted = 0;
+    for (const blog of due) {
+      const session = await mongoose.startSession();
+      try {
+        let flipped = false;
+        const ownerId = blog.user;
+        await session.withTransaction(async () => {
+          // Atomically Draft→Published ONLY if still a Draft. A concurrent
+          // instance (or a re-run) that already promoted this post matches
+          // zero docs here → no award, no notification.
+          const result = await blogModel.updateOne(
+            { _id: blog._id, status: "Draft" },
+            { $set: { status: "Published", publishAt: null } },
+            { session }
+          );
+          flipped = result.modifiedCount === 1;
+          if (!flipped) return;
+          // Award publish points now that the post is actually live (a
+          // scheduled create deferred these until publication time).
+          await awardActivity(ownerId, "publishArticle", 1, session);
+          await createNotification(
+            {
+              recipient: ownerId,
+              actor: null,
+              type: "scheduledPublished",
+              blog: blog._id,
+              text: `Your scheduled post "${blog.title}" is now live.`,
+            },
+            session
+          );
+        });
+        if (flipped) {
+          // Now live — alert the author's followers (in-app + email). Fetch the
+          // promoted doc so followers see the Published state.
+          const fresh = await blogModel.findById(blog._id);
+          notifyFollowersOfNewPost(ownerId, fresh).catch(() => {});
+          promoted++;
+        }
+      } catch (err) {
+        console.error(`Scheduled promotion failed for blog ${blog._id}:`, err.message);
+      } finally {
+        session.endSession();
+      }
+    }
+
+    if (promoted) console.log(`Scheduled publisher: promoted ${promoted} post(s).`);
+    return promoted;
+  } catch (error) {
+    console.error("Scheduled promotion error:", error.message);
+    return 0;
+  }
+};
