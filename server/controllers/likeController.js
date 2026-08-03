@@ -3,6 +3,7 @@ const Like = require("../models/likeModel");
 const blogModel = require("../models/blogModel");
 const userModel = require("../models/userModel");
 const { awardActivity } = require("../utils/points");
+const { createNotification } = require("../utils/notify");
 
 // Toggle a like on behalf of the authenticated user. The user is always taken
 // from the verified token — never from the body (the old endpoint let anyone
@@ -25,6 +26,9 @@ const toggleLike = async (req, res) => {
 
   const session = await mongoose.startSession();
   let liked;
+  // Captured inside the transaction so the response can tell the client whether
+  // this like triggered a level-up / new badge (for the celebration UI).
+  let likerDelta = null;
   try {
     await session.withTransaction(async () => {
       const blog = await blogModel.findById(blog_id).session(session);
@@ -53,8 +57,15 @@ const toggleLike = async (req, res) => {
         liked = true;
         return;
       }
-      await awardActivity(user_id, "likeArticle", 1, session);
+      likerDelta = await awardActivity(user_id, "likeArticle", 1, session);
       await awardActivity(blog.user, "receiveLike", 1, session);
+      // Notify the blog's author about the like (don't notify self-likes).
+      if (String(blog.user) !== String(user_id)) {
+        await createNotification(
+          { recipient: blog.user, actor: user_id, type: "like", blog: blog._id },
+          session
+        );
+      }
       liked = true;
     });
   } catch (e) {
@@ -78,6 +89,10 @@ const toggleLike = async (req, res) => {
     likeCount,
     points: liker ? liker.points : undefined,
     level: liker ? liker.level : undefined,
+    badges: liker ? liker.badges : undefined,
+    // Delta (null on unlike) lets the client fire a level-up / badge celebration.
+    leveledUp: likerDelta ? likerDelta.leveledUp : false,
+    newBadges: likerDelta ? likerDelta.newBadges : [],
   });
 };
 

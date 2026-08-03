@@ -1,0 +1,36 @@
+# Render Blueprint for Inkwell.
+# One web service builds the client (Vite) and serves both the API and the
+# static SPA from the Express server (see Dockerfile). All secrets come from
+# the Render dashboard env groups / per-service env — do NOT hardcode them.
+# After the first deploy, set CLIENT_URL to the service's public URL.
+services:
+  - type: web
+    name: inkwell
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8080
+      - key: MONGO_URL
+        sync: false # set in dashboard (Atlas connection string)
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: CLIENT_URL
+        sync: false # set to your service URL, e.g. https://inkwell.onrender.com
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+      - key: CLOUDINARY_URL
+        sync: false # recommended in prod (durable uploads); optional in dev
+      - key: RUN_SCHEDULER
+        value: "true" # single-instance deploy — the sweep runs here
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false # optional; enables Google sign-in

@@ -2,12 +2,13 @@ import React, { lazy, Suspense } from 'react';
 import { CssBaseline, ThemeProvider as MuiThemeProvider, Box, CircularProgress } from '@mui/material';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { lightTheme, darkTheme } from './theme/theme';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import 'react-toastify/dist/ReactToastify.css';
+import ErrorBoundary from "./components/ErrorBoundary";
 
 // Route-level code-splitting: each page is loaded on demand via React.lazy so
 // the initial bundle only contains the shell (Navbar, providers, theme) + the
@@ -27,6 +28,11 @@ const About = lazy(() => import('./pages/About'));
 const Profile = lazy(() => import("./pages/Profile"));
 const Rewards = lazy(() => import("./pages/Rewards"));
 const EditBlog = lazy(() => import("./pages/EditBlog"));
+const Notifications = lazy(() => import("./pages/Notifications"));
+const Bookmarks = lazy(() => import("./pages/Bookmarks"));
+const ReadingHistory = lazy(() => import("./pages/ReadingHistory"));
+const Analytics = lazy(() => import("./pages/Analytics"));
+const Leaderboard = lazy(() => import("./pages/Leaderboard"));
 const AdminPanel = lazy(() => import("./admin/AdminPanel"));
 
 const PageFallback = () => (
@@ -52,6 +58,7 @@ function AppWrapper() {
         <Toaster />
         <Box component="main" sx={{ flex: 1 }}>
           <Suspense fallback={<PageFallback />}>
+          <ErrorBoundary>
             <Routes>
             {!isAdmin && (
                 <>
@@ -68,6 +75,11 @@ function AppWrapper() {
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/category/:category" element={<Blogs />} />
                   <Route path="/rewards" element={<Rewards />} />
+                  <Route path="/notifications" element={<Notifications />} />
+                  <Route path="/bookmarks" element={<Bookmarks />} />
+                  <Route path="/reading-history" element={<ReadingHistory />} />
+                  <Route path="/analytics" element={<Analytics />} />
+                  <Route path="/leaderboard" element={<Leaderboard />} />
                   <Route path="/edit-blog/:id" element={<EditBlog />} />
                 </>
               )}
@@ -80,6 +92,7 @@ function AppWrapper() {
 
               <Route path="*" element={<Navigate to={isAdmin ? "/admin" : "/"} />} />
             </Routes>
+          </ErrorBoundary>
           </Suspense>
         </Box>
         {!isAdminRoute && <Footer />}

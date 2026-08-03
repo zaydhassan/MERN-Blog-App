@@ -65,17 +65,54 @@ const commentSchema = z.object({
   blog_id: z.string().regex(objectIdRegex, "Invalid blog id"),
 });
 
+// A cover-image URL supplied via the "use image URL" mode (no file upload).
+// Restricted to http(s) so a `javascript:`/`data:` URL or a relative path
+// can't be stored as a blog's cover image (which is rendered in <img> across
+// the site). Empty/absent is allowed — the controller requires an image via
+// either a file upload or this field.
+const imageUrl = z
+  .string()
+  .max(2048)
+  .regex(/^https?:\/\/.+/i, "Image URL must start with http:// or https://")
+  .optional();
+
 // Blog create uses multipart/form-data, so all text fields arrive as strings.
+// NOTE: the validate middleware replaces req.body with the Zod-parsed value,
+// and Zod strips unknown keys by default — so every field the controller reads
+// MUST be declared here, or it's silently dropped on create. (tags/image/
+// publishAt were missing from an earlier version and were being stripped.)
 const blogCreateSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(200),
   description: z.string().min(1, "Description is required"),
   category: z.string().trim().min(1).max(50),
   status: z.enum(["Draft", "Published"]).optional(),
+  image: imageUrl,
+  tags: z.string().optional(),
+  publishAt: z.string().optional(),
+});
+
+// Blog update: all fields optional (partial update). Mirrors the create
+// schema's image-URL rule so a pasted cover URL on edit is also constrained to
+// http(s). Applied on the PUT /update-blog route (previously unvalidated).
+const blogUpdateSchema = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  description: z.string().min(1).optional(),
+  category: z.string().trim().min(1).max(50).optional(),
+  status: z.enum(["Draft", "Published"]).optional(),
+  image: imageUrl,
+  publishAt: z.union([z.string(), z.null()]).optional(),
+  tags: z.string().optional(),
 });
 
 // Admin role change. The role enum matches userModel.
 const promoteUserSchema = z.object({
   role: z.enum(["Reader", "Writer", "Admin"]),
+});
+
+// Bookmark toggle — only the blog id is client-supplied; the user comes from
+// auth middleware.
+const bookmarkSchema = z.object({
+  blog: z.string().regex(objectIdRegex, "Invalid blog id"),
 });
 
 module.exports = {
@@ -87,5 +124,7 @@ module.exports = {
   newsletterSchema,
   commentSchema,
   blogCreateSchema,
+  blogUpdateSchema,
   promoteUserSchema,
+  bookmarkSchema,
 };

@@ -25,13 +25,17 @@ const columns = [
       { label: "Register", to: "/register" },
       { label: "Profile", to: "/profile" },
       { label: "My Blogs", to: "/my-blogs" },
+      { label: "Bookmarks", to: "/bookmarks" },
+      { label: "Reading History", to: "/reading-history" },
     ],
   },
   {
     title: "Writer",
     links: [
       { label: "Create Blog", to: "/create-blog" },
+      { label: "Analytics", to: "/analytics" },
       { label: "Rewards", to: "/rewards" },
+      { label: "Leaderboard", to: "/leaderboard" },
     ],
   },
 ];

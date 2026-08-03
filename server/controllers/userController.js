@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const userModel = require("../models/userModel");
 const bcrypt = require("bcryptjs");
 const Reward = require("../models/rewardModel");
+const PointEvent = require("../models/pointEventModel");
 const {
   publicUser,
   signAccessToken,
@@ -9,20 +10,24 @@ const {
   verifyRefreshToken,
   refreshCookieOptions,
 } = require("../utils/tokenUtils");
+const { getLevel, getBadges } = require("../utils/points");
 
 // The multer configuration that used to live here is gone — uploads now go
 // through the shared, hardened config in ../config/upload (mounted on the
-// route). This controller only reads the already-validated req.file.
+// route). This controller only reads the already-validated req.file and
+// resolves its public URL via fileToUrl (works for both local disk and
+// Cloudinary — the old hand-built `${protocol}://${host}/uploads/<name>`
+// broke under Cloudinary, where the URL is a full CDN URL, not a local path).
+const { fileToUrl } = require("../config/upload");
 exports.uploadImage = (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, message: "No file uploaded" });
   }
 
-  const imageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
   return res.status(200).json({
     success: true,
     message: "Image uploaded successfully",
-    imageUrl,
+    imageUrl: fileToUrl(req.file),
   });
 };
 exports.registerController = async (req, res) => {
@@ -289,22 +294,49 @@ exports.redeemPoints = async (req, res) => {
       return res.status(404).json({ success: false, message: "Reward not found" });
     }
 
-    const user = await userModel.findById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
+    // Atomic conditional decrement — the `{ points: { $gte: cost } }` filter is
+    // the whole fix for the double-spend race the old read-check-save path had
+    // (two concurrent redeems each passed the check, each decremented, balance
+    // went negative). Only a doc that still has enough points at apply time is
+    // touched; a concurrent redeem that already dropped the balance below the
+    // cost matches zero docs and is rejected here.
+    const updated = await userModel.findOneAndUpdate(
+      { _id: userId, points: { $gte: reward.costInPoints } },
+      {
+        $inc: { points: -reward.costInPoints },
+        $push: { redeemedRewards: { rewardId: reward._id } },
+      },
+      { new: true }
+    );
 
-    if (user.points < reward.costInPoints) {
+    if (!updated) {
       return res.status(400).json({ success: false, message: "Not enough points" });
     }
 
-    user.points -= reward.costInPoints;
-    user.redeemedRewards.push({ rewardId: reward._id });
+    // Recompute derived level/badges from the new total (targeted $set — only
+    // those fields — so a concurrent award's points change isn't clobbered).
+    const level = getLevel(updated.points);
+    const badges = getBadges(updated.points);
+    await userModel.updateOne({ _id: updated._id }, { $set: { level, badges } });
 
-    await user.save();
-    res
-      .status(200)
-      .json({ success: true, message: "Reward redeemed successfully", pointsLeft: user.points });
+    // Best-effort audit ledger.
+    try {
+      await PointEvent.create({
+        user: userId,
+        activityType: "redeemReward",
+        points: -reward.costInPoints,
+      });
+    } catch (ledgerErr) {
+      console.error("Redemption ledger write failed:", ledgerErr.message);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Reward redeemed successfully",
+      pointsLeft: updated.points,
+      level,
+      badges,
+    });
   } catch (error) {
     console.error("Error redeeming points:", error.message);
     res.status(500).json({ success: false, message: "Error redeeming points" });
@@ -319,14 +351,63 @@ exports.redeemPoints = async (req, res) => {
 
 exports.getLeaderboard = async (req, res) => {
   try {
-    
-    const topWriters = await userModel.find({ role: "Writer", points: { $gt: 0 } }).sort({ points: -1 }).limit(10);
-    const topReaders = await userModel.find({ role: "Reader", points: { $gt: 0 } }).sort({ points: -1 }).limit(10);
+    const period = (req.query.period || "all").toLowerCase();
+    const valid = { all: "all", week: "week", month: "month" };
+    const periodKey = valid[period] || "all";
+
+    let topWriters, topReaders;
+
+    if (periodKey === "all") {
+      // All-time: read the denormalized points totals straight off the user
+      // docs (the compound {role, points} index serves this).
+      [topWriters, topReaders] = await Promise.all([
+        userModel.find({ role: "Writer", points: { $gt: 0 } }).sort({ points: -1 }).limit(10),
+        userModel.find({ role: "Reader", points: { $gt: 0 } }).sort({ points: -1 }).limit(10),
+      ]);
+    } else {
+      // Time-windowed: sum the append-only PointEvent ledger over the window,
+      // join the user for display fields, then split by role. Window starts:
+      // week = now−7d, month = now−30d.
+      const days = periodKey === "week" ? 7 : 30;
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+      const ranked = await PointEvent.aggregate([
+        { $match: { created_at: { $gte: since } } },
+        { $group: { _id: "$user", points: { $sum: "$points" } } },
+        { $match: { points: { $gt: 0 } } },
+        { $sort: { points: -1 } },
+        { $limit: 10 },
+        {
+          $lookup: {
+            from: "users",
+            localField: "_id",
+            foreignField: "_id",
+            as: "user",
+          },
+        },
+        { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            _id: 1,
+            points: 1,
+            username: "$user.username",
+            role: "$user.role",
+            profile_image: "$user.profile_image",
+            level: "$user.level",
+            badges: "$user.badges",
+          },
+        },
+      ]);
+
+      topWriters = ranked.filter((u) => u.role === "Writer");
+      topReaders = ranked.filter((u) => u.role === "Reader");
+    }
 
     res.json({
       success: true,
       topWriters,
       topReaders,
+      period: periodKey,
     });
   } catch (error) {
     console.error("Error fetching leaderboard:", error);

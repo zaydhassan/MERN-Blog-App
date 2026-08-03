@@ -69,10 +69,23 @@ exports.googleAuthController = async (req, res) => {
     let user = await userModel.findOne({ email });
 
     if (user) {
-      // Existing account — link Google if not already linked, and keep a
-      // profile photo only if the user hasn't set one. (See plan: auto-link on
-      // a verified Google email; a pre-registration takeover caveat remains —
-      // email verification on password signup is the future hardening.)
+      // Pre-registration takeover guard: if an account already exists for this
+      // email AND has a password we didn't issue, do NOT silently link the
+      // Google identity to it. Otherwise an attacker could register
+      // victim@gmail.com with their own password, then "log in with Google"
+      // to take over the victim's email-backed account. (Password signup has
+      // no email-verification step today, so we can't trust that a
+      // password-account owner controls the email.) We only auto-link when
+      // the existing account is itself OAuth-only (no password) — i.e. a
+      // Google-created account returning via Google.
+      if (user.password) {
+        return res.status(409).json({
+          success: false,
+          message:
+            "An account with this email already exists. Log in with your password instead, or reset it if it's yours.",
+        });
+      }
+
       let changed = false;
       if (!user.provider) {
         user.provider = "google";

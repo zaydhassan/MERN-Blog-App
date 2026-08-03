@@ -1,2 +1,12 @@
-# Ignore environment variables
+# Ignore environment variables (real secrets — never commit)
 .env
+
+# Dependencies — install locally with `npm install`; never commit.
+# (node_modules/ was committed in an earlier history. Add the ignore rule
+# here to stop tracking future changes, then untrack with:
+#   git rm -r --cached server/node_modules
+# from the repo root.)
+node_modules/
+
+# Locally-uploaded files (ephemeral on PaaS; use CLOUDINARY_URL in prod).
+uploads/

@@ -24,6 +24,15 @@ const blogSchema = new mongoose.Schema(
       enum: ["Published", "Draft", "Archived"],
       default: "Draft",
     },
+    // When set to a future Date and status is "Draft", the post is scheduled:
+    // the promotion scheduler flips it to "Published" once this time passes.
+    // Null for posts published immediately or unscheduled drafts. Kept on the
+    // doc (not a separate status enum value) so every existing "Published" /
+    // "Draft" query keeps working unchanged.
+    publishAt: {
+      type: Date,
+      default: null,
+    },
     views: {
       type: Number,
       default: 0,
@@ -49,6 +58,8 @@ const blogSchema = new mongoose.Schema(
 blogSchema.index({ status: 1, created_at: -1 });
 blogSchema.index({ category: 1, created_at: -1 });
 blogSchema.index({ user: 1, created_at: -1 });
+// Powers the scheduled-publish promotion sweep: { status: "Draft", publishAt: { $ne: null, $lte: now } }.
+blogSchema.index({ status: 1, publishAt: 1 });
 
 const blogModel = mongoose.model("Blog", blogSchema);
 

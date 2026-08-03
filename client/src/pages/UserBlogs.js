@@ -88,7 +88,7 @@ const UserBlogs = () => {
         toast.success("Blog published successfully!");
         setBlogs((prevBlogs) =>
           prevBlogs.map((blog) =>
-            blog._id === id ? { ...blog, status: "Published" } : blog
+            blog._id === id ? { ...blog, status: "Published", publishAt: null } : blog
           )
         );
       } else {
@@ -103,12 +103,24 @@ const UserBlogs = () => {
     navigate(`/edit-blog/${blog._id}`);
   };
 
-  const filteredBlogs = blogs.filter(
-    (blog) =>
-      blog.status === (filter === "published" ? "Published" : "Draft") &&
+  // A scheduled post is a Draft with a publishAt. It's not a 4th status — the
+  // promotion sweep flips it to Published at the chosen time — so we surface
+  // it under its own tab and keep plain drafts separate.
+  const isScheduled = (blog) => blog.status === "Draft" && blog.publishAt;
+
+  const filteredBlogs = blogs.filter((blog) => {
+    const matchesTab =
+      filter === "published"
+        ? blog.status === "Published"
+        : filter === "scheduled"
+        ? isScheduled(blog)
+        : blog.status === "Draft" && !blog.publishAt; // plain drafts
+    return (
+      matchesTab &&
       (blog.title.toLowerCase().includes(searchTerm) ||
         stripHtml(blog.description).toLowerCase().includes(searchTerm))
-  );
+    );
+  });
 
   return (
     <Box sx={{ flexGrow: 1, minHeight: "100vh", p: { xs: 2, md: 4 } }}>
@@ -143,6 +155,7 @@ const UserBlogs = () => {
         >
           <Tab label="Published" value="published" />
           <Tab label="Drafts" value="draft" />
+          <Tab label="Scheduled" value="scheduled" />
         </Tabs>
       </Box>
 
@@ -193,8 +206,14 @@ const UserBlogs = () => {
                   <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
                     <Chip
                       size="small"
-                      label={blog.status === "Published" ? "Published" : "Draft"}
-                      color={blog.status === "Published" ? "primary" : "default"}
+                      label={
+                        blog.status === "Published"
+                          ? "Published"
+                          : isScheduled(blog)
+                          ? `Scheduled ${moment(blog.publishAt).format("MMM Do, h:mm a")}`
+                          : "Draft"
+                      }
+                      color={blog.status === "Published" ? "primary" : isScheduled(blog) ? "secondary" : "default"}
                       variant={blog.status === "Published" ? "filled" : "outlined"}
                     />
                     <Typography variant="caption" sx={{ color: "text.secondary" }}>
@@ -270,7 +289,7 @@ const UserBlogs = () => {
         ) : (
           <Box sx={{ textAlign: "center", padding: 6, gridColumn: "1 / -1" }}>
             <Typography color="text.secondary" sx={{ mb: 2 }}>
-              {filter === "draft" ? "No drafts yet." : "No published blogs yet."}
+              {filter === "draft" ? "No drafts yet." : filter === "scheduled" ? "No scheduled posts." : "No published blogs yet."}
             </Typography>
             <Button variant="contained" color="primary" onClick={() => navigate("/create-blog")}>
               Create your first blog

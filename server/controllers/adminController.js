@@ -3,6 +3,15 @@ const User = require("../models/userModel");
 const Blog = require("../models/blogModel");
 const Comment = require("../models/commentModel");
 const Like = require("../models/likeModel");
+const Bookmark = require("../models/bookmarkModel");
+const Notification = require("../models/notificationModel");
+const PointEvent = require("../models/pointEventModel");
+const BlogView = require("../models/blogViewModel");
+const Follow = require("../models/followModel");
+const WritingActivity = require("../models/writingActivityModel");
+const BlogRevision = require("../models/blogRevisionModel");
+const BlogTag = require("../models/BlogTag");
+const { awardActivity } = require("../utils/points");
 const { publicUser } = require("../utils/tokenUtils");
 
 const getAllUsers = async (req, res) => {
@@ -40,11 +49,28 @@ const deleteUser = async (req, res) => {
       if (blogIds.length) {
         await Comment.deleteMany({ blog_id: { $in: blogIds } }).session(session);
         await Like.deleteMany({ blog_id: { $in: blogIds } }).session(session);
+        await Bookmark.deleteMany({ blog: { $in: blogIds } }).session(session);
+        await Notification.deleteMany({ blog: { $in: blogIds } }).session(session);
+        await BlogView.deleteMany({ blog_id: { $in: blogIds } }).session(session);
+        await BlogRevision.deleteMany({ blog: { $in: blogIds } }).session(session);
+        await BlogTag.deleteMany({ blog_id: { $in: blogIds } }).session(session);
       }
       await Blog.deleteMany({ user: id }).session(session);
-      // Delete the user's own comments/likes elsewhere.
+      // Delete the user's own comments/likes/bookmarks/views elsewhere.
       await Comment.deleteMany({ user_id: id }).session(session);
       await Like.deleteMany({ user_id: id }).session(session);
+      await Bookmark.deleteMany({ user: id }).session(session);
+      await BlogView.deleteMany({ user_id: id }).session(session);
+      // Notifications where the deleted user was recipient or actor, and
+      // their point ledger (so time-windowed leaderboards drop them).
+      await Notification.deleteMany({
+        $or: [{ recipient: id }, { actor: id }],
+      }).session(session);
+      await PointEvent.deleteMany({ user: id }).session(session);
+      // Follow edges where the deleted user is either side, and their daily
+      // writing ledger (streak/goal history).
+      await Follow.deleteMany({ $or: [{ follower: id }, { followee: id }] }).session(session);
+      await WritingActivity.deleteMany({ user: id }).session(session);
       await User.findByIdAndDelete(id).session(session);
     });
 
@@ -57,7 +83,10 @@ const deleteUser = async (req, res) => {
   }
 };
 
-// Cascade delete: removing a blog also removes its comments and likes.
+// Cascade delete: removing a blog also removes its comments, likes,
+// bookmarks, notifications, view rows, revision history and tag links —
+// matching the writer-side delete cascade (which previously left these
+// orphaned). Done in a transaction so we don't leave orphans if one step fails.
 const deleteBlog = async (req, res) => {
   const session = await mongoose.startSession();
   try {
@@ -65,6 +94,11 @@ const deleteBlog = async (req, res) => {
     await session.withTransaction(async () => {
       await Comment.deleteMany({ blog_id: id }).session(session);
       await Like.deleteMany({ blog_id: id }).session(session);
+      await Bookmark.deleteMany({ blog: id }).session(session);
+      await Notification.deleteMany({ blog: id }).session(session);
+      await BlogView.deleteMany({ blog_id: id }).session(session);
+      await BlogRevision.deleteMany({ blog: id }).session(session);
+      await BlogTag.deleteMany({ blog_id: id }).session(session);
       await Blog.findByIdAndDelete(id).session(session);
     });
     res.status(200).json({ success: true, message: "Blog deleted successfully" });
@@ -86,9 +120,27 @@ const getComments = async (req, res) => {
   }
 };
 
+// Admin comment deletion. Reverses the points that were awarded when the
+// comment was created (best-effort, never blocks the delete) so an admin
+// removing a farmed/abusive comment also claws back the points it granted.
 const deleteComment = async (req, res) => {
   try {
     const { id } = req.params;
+    const comment = await Comment.findById(id);
+    if (!comment) {
+      return res.status(404).json({ success: false, message: "Comment not found." });
+    }
+    try {
+      const blog = await Blog.findById(comment.blog_id).select("user");
+      if (blog) {
+        await awardActivity(comment.user_id, "commentArticle", -1);
+        if (String(blog.user) !== String(comment.user_id)) {
+          await awardActivity(blog.user, "receiveComment", -1);
+        }
+      }
+    } catch (revErr) {
+      console.error("Point reversal failed on admin comment delete:", revErr.message);
+    }
     await Comment.findByIdAndDelete(id);
     res.status(200).json({ success: true, message: "Comment deleted successfully" });
   } catch (error) {

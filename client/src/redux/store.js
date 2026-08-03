@@ -53,6 +53,17 @@ const authSlice = createSlice({
       localStorage.removeItem("isLogin");
       localStorage.removeItem("user");
     },
+    // Sync points/level/badges into the store + localStorage after a server
+    // award (e.g. a like returned a new level). Today nothing updates these
+    // post-like, so the Navbar/Profile showed stale gamification until reload.
+    setGamification(state, action) {
+      if (!state.user) return;
+      const { points, level, badges } = action.payload || {};
+      if (points !== undefined) state.user.points = points;
+      if (level !== undefined) state.user.level = level;
+      if (badges !== undefined) state.user.badges = badges;
+      localStorage.setItem("user", JSON.stringify(state.user));
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -70,9 +81,108 @@ const authSlice = createSlice({
 });
 
 export const authActions = authSlice.actions;
+// Exported individually so pages can dispatch the gamification sync reducer
+// after a server award without reaching into the actions namespace object.
+export const { setGamification } = authSlice.actions;
+
+// ---- Notifications slice ----
+// The Navbar bell reads `unreadCount` (polled on app mount + every 60s while
+// logged in); the Notifications page reads `list` + pagination meta.
+export const fetchUnreadCount = createAsyncThunk(
+  "notifications/fetchUnreadCount",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await axios.get("/api/v1/notifications/unread-count");
+      return data.unreadCount || 0;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || "failed");
+    }
+  }
+);
+
+export const fetchNotifications = createAsyncThunk(
+  "notifications/fetchNotifications",
+  async ({ page = 1, limit = 20 } = {}, { rejectWithValue }) => {
+    try {
+      const { data } = await axios.get(
+        `/api/v1/notifications?page=${page}&limit=${limit}`
+      );
+      return { notifications: data.notifications, ...data, page, limit };
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || "failed");
+    }
+  }
+);
+
+export const markAllNotificationsRead = createAsyncThunk(
+  "notifications/markAllRead",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await axios.patch("/api/v1/notifications/read-all");
+      return data.updated || 0;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || "failed");
+    }
+  }
+);
+
+const notificationsSlice = createSlice({
+  name: "notifications",
+  initialState: {
+    list: [],
+    unreadCount: 0,
+    page: 1,
+    totalPages: 1,
+    total: 0,
+    hasMore: false,
+    status: "idle",
+  },
+  reducers: {
+    clearNotifications(state) {
+      state.list = [];
+      state.unreadCount = 0;
+      state.page = 1;
+      state.totalPages = 1;
+      state.total = 0;
+      state.hasMore = false;
+    },
+    // Decrement the badge locally when a notification is opened (optimistic).
+    decrementUnread(state) {
+      if (state.unreadCount > 0) state.unreadCount -= 1;
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchUnreadCount.fulfilled, (state, action) => {
+        state.unreadCount = action.payload;
+      })
+      .addCase(fetchNotifications.fulfilled, (state, action) => {
+        const { notifications, totalPages, total, hasMore, page } = action.payload;
+        state.list = page === 1 ? notifications : [...state.list, ...notifications];
+        state.page = page;
+        state.totalPages = totalPages || 1;
+        state.total = total || 0;
+        state.hasMore = !!hasMore;
+        state.status = "idle";
+      })
+      .addCase(fetchNotifications.pending, (state) => {
+        state.status = "loading";
+      })
+      .addCase(markAllNotificationsRead.fulfilled, (state) => {
+        state.unreadCount = 0;
+        state.list = state.list.map((n) => ({ ...n, read: true }));
+      });
+  },
+});
+
+export const notificationsActions = notificationsSlice.actions;
+// Exported individually so components can dispatch the optimistic reducer
+// without reaching into the actions namespace object.
+export const { clearNotifications, decrementUnread } = notificationsSlice.actions;
 
 export const store = configureStore({
   reducer: {
     auth: authSlice.reducer,
+    notifications: notificationsSlice.reducer,
   },
 });

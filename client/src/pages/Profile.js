@@ -21,6 +21,8 @@ import GlassCard from "../components/GlassCard";
 import GradientButton from "../components/GradientButton";
 import UserAvatar from "../components/UserAvatar";
 import SectionHeading from "../components/SectionHeading";
+import LeaderboardCard, { LEVEL_BANDS } from "../components/LeaderboardCard";
+import WritingStreakCard from "../components/WritingStreak";
 
 const Profile = () => {
   const user = useSelector(state => state.auth.user);
@@ -51,16 +53,10 @@ const Profile = () => {
   const [badges, setBadges] = useState([]);
   const [topWriters, setTopWriters] = useState([]);
   const [topReaders, setTopReaders] = useState([]);
+  const [followInfo, setFollowInfo] = useState({ followersCount: 0, followingCount: 0 });
 
-  // Level thresholds mirror the server's getLevel() so the progress bar is
-  // consistent with the displayed level. Each band knows its floor and the
-  // points needed to reach the next level; the top band has no "next".
-  const LEVEL_BANDS = [
-    { min: 0, next: 500 },
-    { min: 500, next: 1000 },
-    { min: 1000, next: 3000 },
-    { min: 3000, next: null },
-  ];
+  // Level thresholds are shared with the Leaderboard page via the
+  // LeaderboardCard module so there's one source of truth (see LEVEL_BANDS).
   const band = LEVEL_BANDS.find((b) => points >= b.min && (b.next === null || points < b.next)) || LEVEL_BANDS[LEVEL_BANDS.length - 1];
   const isMaxLevel = band.next === null;
   const nextLevelPoints = isMaxLevel ? points : band.next;
@@ -154,6 +150,10 @@ const Profile = () => {
       fetchLeaderboard();
       setIsLoading(false);
       fetchRewards();
+      // Followers / following counts for the header card (best-effort).
+      axios.get(`/api/v1/follow/info/${user._id}`)
+        .then(({ data }) => data.success && setFollowInfo({ followersCount: data.followersCount, followingCount: data.followingCount }))
+        .catch(() => {});
     }
   }, [user, points, fetchUserStats, fetchLeaderboard]);
 
@@ -201,19 +201,21 @@ const Profile = () => {
         formData.append('image', selectedImage);
 
         try {
-          const imageResponse = await fetch(`/api/v1/user/upload-image`, {
-            method: 'POST',
-            body: formData,
-          });
-
-          const imageData = await imageResponse.json();
-          if (imageResponse.ok) {
+          // Use axios (not fetch) so the request interceptor attaches the
+          // Bearer access token and the 401-refresh-retry path applies. The
+          // old fetch() call sent no Authorization header → 401 every time.
+          const { data: imageData } = await axios.post(
+            '/api/v1/user/upload-image',
+            formData,
+            { headers: { "Content-Type": "multipart/form-data" } }
+          );
+          if (imageData?.success && imageData.imageUrl) {
             updatedData.profile_image = imageData.imageUrl;
           } else {
-            throw new Error(imageData.message || 'Image upload failed');
+            throw new Error(imageData?.message || 'Image upload failed');
           }
         } catch (error) {
-          toast.error('Failed to upload image');
+          toast.error(error?.response?.data?.message || 'Failed to upload image');
           return;
         }
       }
@@ -270,30 +272,6 @@ const Profile = () => {
     </ListItem>
   );
 
-  const LeaderboardCard = ({ title, emoji, rows }) => (
-    <GlassCard sx={{ p: 2, mt: 2 }}>
-      <Typography variant="subtitle2" sx={{ textAlign: "center", color: "primary.main", fontWeight: 700, mb: 1 }}>
-        {emoji} {title}
-      </Typography>
-      {rows.length > 0 ? (
-        rows.map((entry, index) => (
-          <ListItem key={entry._id} disableGutters sx={{ py: 0.25 }}>
-            <ListItemText
-              primary={`${index + 1}. ${entry.username}`}
-              secondary={`${entry.points} Points`}
-              primaryTypographyProps={{ variant: "body2" }}
-              secondaryTypographyProps={{ variant: "caption" }}
-            />
-          </ListItem>
-        ))
-      ) : (
-        <Typography variant="body2" sx={{ textAlign: "center", color: "text.secondary" }}>
-          No {title.toLowerCase()} yet.
-        </Typography>
-      )}
-    </GlassCard>
-  );
-
   return (
     <>
       <ToastContainer
@@ -322,8 +300,8 @@ const Profile = () => {
             {navItem("Leaderboard", <LeaderboardIcon fontSize="small" />, () => {})}
           </List>
 
-          <LeaderboardCard title="Top Writers" emoji="✍️" rows={topWriters} />
-          <LeaderboardCard title="Top Readers" emoji="📖" rows={topReaders} />
+          <LeaderboardCard title="Top Writers" emoji="✍️" rows={topWriters} currentUserId={user?._id} />
+          <LeaderboardCard title="Top Readers" emoji="📖" rows={topReaders} currentUserId={user?._id} />
 
           <List sx={{ mt: 2 }}>
             {navItem("Logout", <ExitToAppIcon fontSize="small" />, handleLogout)}
@@ -377,6 +355,11 @@ const Profile = () => {
               <Typography variant="caption" sx={{ mt: 1, display: "block", color: "text.secondary" }}>
                 {isMaxLevel ? "Max level reached 🏆" : `${progress.toFixed(1)}% to ${nextLevelPoints} points`}
               </Typography>
+
+              <Stack direction="row" spacing={1} justifyContent="center" sx={{ mt: 2 }}>
+                <Chip label={`${followInfo.followersCount} followers`} variant="outlined" size="small" />
+                <Chip label={`${followInfo.followingCount} following`} variant="outlined" size="small" />
+              </Stack>
             </GlassCard>
 
             {/* Badges */}
@@ -392,6 +375,11 @@ const Profile = () => {
                 <Typography variant="body2" sx={{ color: "text.secondary" }}>No badges yet. Keep engaging!</Typography>
               )}
             </Box>
+
+            {/* Writing streak + daily goal + contribution heatmap */}
+            <GlassCard sx={{ p: { xs: 3, md: 4 }, width: "100%" }}>
+              <WritingStreakCard />
+            </GlassCard>
 
             {/* Rewards */}
             <GlassCard sx={{ p: 3, width: "100%" }}>

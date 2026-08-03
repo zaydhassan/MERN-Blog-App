@@ -8,6 +8,14 @@
 //  - UUID filenames (no user-controlled names on disk)
 //  - post-save magic-byte verification (rejects files whose bytes don't match
 //    their declared type, e.g. a .exe renamed to .jpg)
+//
+// Storage is config-driven: when CLOUDINARY_URL is set, uploads stream straight
+// to Cloudinary (the durable fix for the ephemeral-filesystem problem on
+// PaaS — Render/Railway containers lose local uploads/ on every redeploy, so
+// avatars and cover images vanished). Without CLOUDINARY_URL we keep the
+// local-disk behavior so dev works unchanged. Mirrors the mailer.js no-op
+// pattern. The optional cloudinary packages are required lazily so the app
+// still boots when they aren't installed (local-disk dev).
 
 const multer = require("multer");
 const path = require("path");
@@ -30,18 +38,51 @@ const EXT_BY_MIME = {
   "image/gif": ".gif",
 };
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => {
-    const ext = EXT_BY_MIME[file.mimetype] || path.extname(file.originalname).toLowerCase();
-    cb(null, crypto.randomUUID() + ext);
-  },
-});
-
 const fileFilter = (req, file, cb) => {
   if (ALLOWED_MIMES.includes(file.mimetype)) return cb(null, true);
   return cb(new Error("Only JPEG, PNG, WebP, and GIF images are allowed."), false);
 };
+
+// --- Storage backend selection ------------------------------------------------
+let usingCloudinary = false;
+let storage;
+
+if (process.env.CLOUDINARY_URL) {
+  try {
+    const { v2: cloudinary } = require("cloudinary");
+    const { CloudinaryStorage } = require("multer-storage-cloudinary");
+    cloudinary.config({ cloudinary_url: process.env.CLOUDINARY_URL });
+    storage = new CloudinaryStorage({
+      cloudinary,
+      params: {
+        folder: "inkwell",
+        allowed_formats: ["jpg", "png", "webp", "gif"],
+        unique_filename: true,
+        overwrite: false,
+      },
+    });
+    usingCloudinary = true;
+  } catch (err) {
+    // Packages missing — fall back to local disk but warn loudly so an
+    // operator who set CLOUDINARY_URL notices the uploads aren't actually
+    // going to Cloudinary.
+    console.error(
+      "CLOUDINARY_URL is set but the `cloudinary` / `multer-storage-cloudinary` packages are not installed; " +
+        "falling back to local-disk storage. Run `npm i cloudinary multer-storage-cloudinary` to enable Cloudinary.",
+      err.message
+    );
+  }
+}
+
+if (!storage) {
+  storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+    filename: (req, file, cb) => {
+      const ext = EXT_BY_MIME[file.mimetype] || path.extname(file.originalname).toLowerCase();
+      cb(null, crypto.randomUUID() + ext);
+    },
+  });
+}
 
 const upload = multer({
   storage,
@@ -49,10 +90,24 @@ const upload = multer({
   fileFilter,
 });
 
+// Resolve the public URL for an uploaded file regardless of backend. With
+// Cloudinary, multer-storage-cloudinary puts the full https URL on
+// `file.path` (and `file.url`); with local disk we serve from /uploads/<name>.
+// Callers (userController.uploadImage, blogController create/update) use this
+// instead of hand-building `/uploads/<filename>`, which would have produced a
+// broken relative URL under Cloudinary.
+const fileToUrl = (file) => {
+  if (!file) return null;
+  if (file.path && /^https?:\/\//.test(file.path)) return file.path; // Cloudinary
+  if (file.url) return file.url;
+  return `/uploads/${file.filename}`; // local disk
+};
+
 // Read the first bytes of the saved file and confirm they match an allowed
 // image signature. Run this AFTER upload.single(). If the content is wrong,
 // delete the file and reject the request — do not keep attacker-controlled
-// bytes on disk.
+// bytes on disk. Skipped for Cloudinary (no local file; Cloudinary validates
+// content/type server-side per allowed_formats).
 const matchesMagic = (buf, mime) => {
   const b = buf;
   switch (mime) {
@@ -75,6 +130,7 @@ const matchesMagic = (buf, mime) => {
 
 const validateImageFile = (req, res, next) => {
   if (!req.file) return next();
+  if (usingCloudinary) return next(); // no local file to inspect
   fs.readFile(req.file.path, (err, buf) => {
     if (err) return next(err);
     if (!matchesMagic(buf, req.file.mimetype)) {
@@ -87,4 +143,4 @@ const validateImageFile = (req, res, next) => {
   });
 };
 
-module.exports = { upload, validateImageFile, MAX_BYTES, ALLOWED_MIMES };
+module.exports = { upload, validateImageFile, fileToUrl, usingCloudinary, MAX_BYTES, ALLOWED_MIMES };

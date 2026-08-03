@@ -1,0 +1,17 @@
+{
+  "name": "mern-blog-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Inkwell — a MERN blogging platform with engagement/gamification features.",
+  "scripts": {
+    "install:client": "npm --prefix client install",
+    "install:server": "npm --prefix server install",
+    "install:all": "npm run install:client && npm run install:server",
+    "dev:client": "npm --prefix client run dev",
+    "dev:server": "npm --prefix server run dev",
+    "build:client": "npm --prefix client run build",
+    "start:server": "npm --prefix server start",
+    "build": "npm run install:all && npm run build:client"
+  },
+  "license": "ISC"
+}
