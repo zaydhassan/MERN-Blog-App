@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Typography, TextField, Box, IconButton, InputAdornment, Stack, Divider } from "@mui/material";
 import { Visibility, VisibilityOff, Email as EmailIcon, Lock as LockIcon } from "@mui/icons-material";
 import axios from "axios";
@@ -15,6 +15,7 @@ import { signInWithGoogle } from "../firebase/googleAuth";
 
 const Login = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const dispatch = useDispatch();
   const [inputs, setInputs] = useState({ email: "", password: "" });
 
@@ -82,8 +83,14 @@ const Login = () => {
         dispatch(authActions.login(data.user));
 
         // Navigate immediately — no artificial delay. The navbar reflects
-        // the logged-in state on the destination page.
-        const target = data.user.role === "Admin" ? "/admin" : "/";
+        // the logged-in state on the destination page. Honor a `?redirect=`
+        // param (set by the auth guard) so users land back where they were
+        // headed; admins always go to the admin console regardless.
+        const redirect = searchParams.get("redirect");
+        const target =
+          data.user.role === "Admin"
+            ? "/admin"
+            : redirect || "/";
         navigate(target);
       } else {
         setBannerMessage(data.message || "Login failed! Please try again.");
