@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Container, TextField, Typography, Skeleton, Stack } from '@mui/material';
-import { useNavigate, Link } from 'react-router-dom';
+import { Box, Container, TextField, Typography, Stack } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
 import { validateEmail } from '../utils/validate';
-import BlogGrid from '../components/BlogGrid';
-import BlogCard from '../components/BlogCard';
 import GlassCard from '../components/GlassCard';
 import GradientButton from '../components/GradientButton';
 import SectionHeading from '../components/SectionHeading';
+import CommunitySection from '../components/CommunitySection';
+import GradientText from '../components/GradientText';
 
 const heroImages = ['/hero.png', '/hero1.png', '/hero2.png', '/hero3.jpg'];
 
@@ -54,6 +54,18 @@ const Home = () => {
     };
     fetchBlogs();
   }, []);
+
+  // Re-run the landing feed fetch (used by the community section's retry
+  // control when the initial request fails).
+  const refetchBlogs = () => {
+    setLoadingBlogs(true);
+    setBlogsError(false);
+    axios
+      .get(`/api/v1/blog/all-blog?page=1&limit=${HOME_BLOG_LIMIT}`)
+      .then(({ data }) => setBlogs(data.success ? data.blogs || [] : []))
+      .catch(() => setBlogsError(true))
+      .finally(() => setLoadingBlogs(false));
+  };
 
   const handleSubscribe = async () => {
     const err = validateEmail(email);
@@ -135,7 +147,7 @@ const Home = () => {
               textShadow: '0 2px 20px rgba(0,0,0,0.4)',
             }}
           >
-            Where great writing finds its readers
+            Where great writing <GradientText>finds its readers</GradientText>
           </Typography>
           <Typography variant="subtitle1" sx={{ color: 'rgba(255,255,255,0.88)', maxWidth: 620, mt: 2.5, lineHeight: 1.7 }}>
             Inkwell is a modern home for writers and readers. Publish rich stories,
@@ -203,77 +215,14 @@ const Home = () => {
         </GlassCard>
       </Container>
 
-      {/* Recent posts */}
-      <Container maxWidth="lg" sx={{ py: 6 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 2, mb: 1 }}>
-          <SectionHeading
-            eyebrow="Fresh ink"
-            title="Latest from the community"
-            subtitle="Hand-picked stories, fresh off the press."
-            badge
-            align="left"
-            sx={{ mb: 0 }}
-          />
-          {!loadingBlogs && !blogsError && blogs.length > 0 && (
-            <Link to="/blogs" style={{ textDecoration: 'none' }}>
-              <Typography variant="body2" sx={{ color: 'primary.main', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                View all →
-              </Typography>
-            </Link>
-          )}
-        </Box>
-        <BlogGrid sx={{ mt: 3 }}>
-          {loadingBlogs ? (
-            // Skeleton placeholders keep the grid's shape while posts load.
-            Array.from({ length: HOME_BLOG_LIMIT }).map((_, i) => (
-              <GlassCard key={i} sx={{ p: 0 }}>
-                <Skeleton variant="rectangular" height={200} animation="wave" />
-                <Box sx={{ p: 2.5 }}>
-                  <Skeleton variant="text" sx={{ fontSize: '1.25rem' }} animation="wave" />
-                  <Skeleton variant="text" animation="wave" />
-                  <Skeleton variant="text" animation="wave" width="80%" />
-                </Box>
-              </GlassCard>
-            ))
-          ) : blogsError ? (
-            <Box sx={{ gridColumn: '1 / -1', textAlign: 'center', py: 6 }}>
-              <Typography color="text.secondary" sx={{ mb: 2 }}>We couldn't load the latest stories. Please try again.</Typography>
-              <GradientButton
-                onClick={() => {
-                  setBlogsError(false);
-                  setLoadingBlogs(true);
-                  axios
-                    .get(`/api/v1/blog/all-blog?page=1&limit=${HOME_BLOG_LIMIT}`)
-                    .then(({ data }) => setBlogs(data.blogs || []))
-                    .catch(() => setBlogsError(true))
-                    .finally(() => setLoadingBlogs(false));
-                }}
-              >
-                Retry
-              </GradientButton>
-            </Box>
-          ) : blogs.length > 0 ? (
-            blogs.map((blog) => (
-              <BlogCard
-                key={blog._id}
-                id={blog._id}
-                title={blog.title}
-                description={blog.description}
-                image={blog.image || '/tech1.jpeg'}
-                username={blog.user?.username}
-                profileImage={blog.user?.profile_image}
-                time={blog.created_at}
-                tags={blog.tags?.map((t) => (typeof t === 'string' ? t : t?.tag_name)).filter(Boolean)}
-              />
-            ))
-          ) : (
-            <Box sx={{ gridColumn: '1 / -1', textAlign: 'center', py: 6 }}>
-              <Typography color="text.secondary" sx={{ mb: 2 }}>No stories published yet — be the first to share one.</Typography>
-              <GradientButton onClick={() => navigate(isLogin ? '/create-blog' : '/register')}>Start writing</GradientButton>
-            </Box>
-          )}
-        </BlogGrid>
-      </Container>
+      {/* Recent posts / community section */}
+      <CommunitySection
+        blogs={blogs}
+        loading={loadingBlogs}
+        error={blogsError}
+        onRetry={refetchBlogs}
+        onStartWriting={() => navigate(isLogin ? '/create-blog' : '/register')}
+      />
     </Box>
   );
 };

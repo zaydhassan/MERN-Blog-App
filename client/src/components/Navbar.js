@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { AppBar, Toolbar, IconButton, Button, MenuItem, Menu, Drawer, Box, Stack, Container, ListItemIcon, ListItemText, Divider } from "@mui/material";
 import { motion } from "framer-motion";
 import MenuIcon from "@mui/icons-material/Menu";
+import SearchIcon from "@mui/icons-material/Search";
 import NightsStayIcon from "@mui/icons-material/NightsStay";
 import Brightness5Icon from "@mui/icons-material/Brightness5";
 import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
@@ -23,6 +24,7 @@ import UserAvatar from "./UserAvatar";
 import BrandLogo from "./BrandLogo";
 import NotificationBell from "./NotificationBell";
 import { authActions, fetchUnreadCount } from "../redux/store";
+import useRequireAuth from "../hooks/useRequireAuth";
 
 const NAV_ITEMS = [
   { label: "Home", path: "/", match: (p) => p === "/" },
@@ -55,6 +57,7 @@ const Navbar = () => {
   const { logout } = useAuth();
   const dispatch = useDispatch();
   const location = useLocation();
+  const go = useRequireAuth();
   const [anchorEl, setAnchorEl] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -97,19 +100,19 @@ const Navbar = () => {
     navigate("/");
   };
 
-  const handleNavigation = (path) => (isLogin ? navigate(path) : navigate("/login"));
-
   // Profile dropdown items. Each carries its own icon; Analytics is
   // writer/admin-only. Logout is rendered separately below a divider.
+  // All entries route through `go` (useRequireAuth) so an anonymous click
+  // is bounced to /login with a redirect-back param, matching the footer.
   const menuItems = [
-    { icon: <AccountCircleIcon fontSize="small" />, label: "Profile", onClick: () => navigate("/profile") },
-    { icon: <NotificationsIcon fontSize="small" />, label: "Notifications", onClick: () => navigate("/notifications") },
-    { icon: <BookmarkBorderIcon fontSize="small" />, label: "Bookmarks", onClick: () => navigate("/bookmarks") },
-    { icon: <HistoryIcon fontSize="small" />, label: "Reading History", onClick: () => navigate("/reading-history") },
-    { icon: <BarChartIcon fontSize="small" />, label: "Analytics", onClick: () => navigate("/analytics"), show: user?.role === "Writer" || user?.role === "Admin" },
-    { icon: <LeaderboardIcon fontSize="small" />, label: "Leaderboard", onClick: () => navigate("/leaderboard") },
-    { icon: <ArticleIcon fontSize="small" />, label: "My Blogs", onClick: () => handleNavigation("/my-blogs") },
-    { icon: <PostAddIcon fontSize="small" />, label: "Create Blog", onClick: () => handleNavigation("/create-blog") },
+    { icon: <AccountCircleIcon fontSize="small" />, label: "Profile", onClick: () => go("/profile") },
+    { icon: <NotificationsIcon fontSize="small" />, label: "Notifications", onClick: () => go("/notifications") },
+    { icon: <BookmarkBorderIcon fontSize="small" />, label: "Bookmarks", onClick: () => go("/bookmarks") },
+    { icon: <HistoryIcon fontSize="small" />, label: "Reading History", onClick: () => go("/reading-history") },
+    { icon: <BarChartIcon fontSize="small" />, label: "Analytics", onClick: () => go("/analytics"), show: user?.role === "Writer" || user?.role === "Admin" },
+    { icon: <LeaderboardIcon fontSize="small" />, label: "Leaderboard", onClick: () => go("/leaderboard") },
+    { icon: <ArticleIcon fontSize="small" />, label: "My Blogs", onClick: () => go("/my-blogs") },
+    { icon: <PostAddIcon fontSize="small" />, label: "Create Blog", onClick: () => go("/create-blog") },
   ];
 
   return (
@@ -180,7 +183,7 @@ const Navbar = () => {
               {NAV_ITEMS.map((item) => {
                 const active = item.match(location.pathname);
                 return (
-                  <Button key={item.label} sx={navBtnSx(active)} onClick={() => navigate(item.path)}>
+                  <Button key={item.label} sx={navBtnSx(active)} onClick={() => go(item.path)}>
                     {item.label}
                   </Button>
                 );
@@ -218,7 +221,7 @@ const Navbar = () => {
                           backgroundColor: active ? "brandSoft" : "transparent",
                           "&:hover": { backgroundColor: "brandSoft", color: "primary.main" },
                         }}
-                        onClick={() => (item.label === "Blogs" ? handleNavigation(item.path) : navigate(item.path))}
+                        onClick={() => go(item.path)}
                       >
                         {item.label}
                       </Button>
@@ -238,7 +241,7 @@ const Navbar = () => {
                         backgroundColor: location.pathname === "/notifications" ? "brandSoft" : "transparent",
                         "&:hover": { backgroundColor: "brandSoft", color: "primary.main" },
                       }}
-                      onClick={() => { navigate("/notifications"); setMobileOpen(false); }}
+                      onClick={() => { go("/notifications"); setMobileOpen(false); }}
                     >
                       Notifications
                     </Button>
@@ -257,7 +260,7 @@ const Navbar = () => {
                         backgroundColor: location.pathname === "/bookmarks" ? "brandSoft" : "transparent",
                         "&:hover": { backgroundColor: "brandSoft", color: "primary.main" },
                       }}
-                      onClick={() => { navigate("/bookmarks"); setMobileOpen(false); }}
+                      onClick={() => { go("/bookmarks"); setMobileOpen(false); }}
                     >
                       Bookmarks
                     </Button>
@@ -276,7 +279,7 @@ const Navbar = () => {
                         backgroundColor: location.pathname === "/reading-history" ? "brandSoft" : "transparent",
                         "&:hover": { backgroundColor: "brandSoft", color: "primary.main" },
                       }}
-                      onClick={() => { navigate("/reading-history"); setMobileOpen(false); }}
+                      onClick={() => { go("/reading-history"); setMobileOpen(false); }}
                     >
                       Reading History
                     </Button>
@@ -295,7 +298,7 @@ const Navbar = () => {
                         backgroundColor: location.pathname === "/analytics" ? "brandSoft" : "transparent",
                         "&:hover": { backgroundColor: "brandSoft", color: "primary.main" },
                       }}
-                      onClick={() => { navigate("/analytics"); setMobileOpen(false); }}
+                      onClick={() => { go("/analytics"); setMobileOpen(false); }}
                     >
                       Analytics
                     </Button>
@@ -305,11 +308,19 @@ const Navbar = () => {
             </Drawer>
 
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+              <IconButton
+                onClick={() => window.dispatchEvent(new CustomEvent("open-command-palette"))}
+                color="inherit"
+                aria-label="Search (⌘K)"
+                sx={{ borderRadius: 999, "&:hover": { backgroundColor: "action.hover" } }}
+              >
+                <SearchIcon />
+              </IconButton>
               {isLogin && (
                 <>
                   <NotificationBell />
                   <IconButton
-                    onClick={() => navigate("/bookmarks")}
+                    onClick={() => go("/bookmarks")}
                     color="inherit"
                     aria-label="Bookmarks"
                     sx={{ borderRadius: 999, "&:hover": { backgroundColor: "action.hover" } }}

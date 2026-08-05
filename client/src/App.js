@@ -9,6 +9,8 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import 'react-toastify/dist/ReactToastify.css';
 import ErrorBoundary from "./components/ErrorBoundary";
+import AuroraBackground from "./components/AuroraBackground";
+import CommandPalette from "./components/CommandPalette";
 
 // Route-level code-splitting: each page is loaded on demand via React.lazy so
 // the initial bundle only contains the shell (Navbar, providers, theme) + the
@@ -53,6 +55,8 @@ function AppWrapper() {
   return (
     <MuiThemeProvider theme={themeInstance}>
       <CssBaseline />
+      <AuroraBackground />
+      <CommandPalette />
       <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
         {!isAdminRoute && <Navbar />}
         <Toaster />

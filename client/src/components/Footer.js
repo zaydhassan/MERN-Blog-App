@@ -1,12 +1,18 @@
 import React from "react";
 import { Box, Container, Typography, IconButton, Link as MuiLink, Divider, Stack } from "@mui/material";
-import { Link } from "react-router-dom";
-import { useTheme } from "../context/ThemeContext";
-import GradientButton from "./GradientButton";
 import BrandLogo from "./BrandLogo";
-import Brightness4Icon from "@mui/icons-material/Brightness4";
-import Brightness7Icon from "@mui/icons-material/Brightness7";
-import EmailIcon from "@mui/icons-material/Email";
+import useRequireAuth from "../hooks/useRequireAuth";
+import XIcon from "@mui/icons-material/X";
+import GitHubIcon from "@mui/icons-material/GitHub";
+import LinkedInIcon from "@mui/icons-material/LinkedIn";
+import InstagramIcon from "@mui/icons-material/Instagram";
+
+const socials = [
+  { label: "X", href: "#", Icon: XIcon },
+  { label: "GitHub", href: "#", Icon: GitHubIcon },
+  { label: "LinkedIn", href: "#", Icon: LinkedInIcon },
+  { label: "Instagram", href: "#", Icon: InstagramIcon },
+];
 
 const columns = [
   {
@@ -41,8 +47,8 @@ const columns = [
 ];
 
 const Footer = () => {
-  const { theme, toggleTheme } = useTheme();
   const year = new Date().getFullYear();
+  const go = useRequireAuth();
 
   return (
     <Box
@@ -71,14 +77,19 @@ const Footer = () => {
               your way up the leaderboard.
             </Typography>
             <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-              <IconButton aria-label="Email" size="small"><EmailIcon fontSize="small" /></IconButton>
-              <IconButton
-                aria-label="Toggle light/dark theme"
-                onClick={toggleTheme}
-                size="small"
-              >
-                {theme === "dark" ? <Brightness7Icon fontSize="small" /> : <Brightness4Icon fontSize="small" />}
-              </IconButton>
+              {socials.map(({ label, href, Icon }) => (
+                <IconButton
+                  key={label}
+                  aria-label={label}
+                  href={href}
+                  size="small"
+                  component="a"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Icon fontSize="small" />
+                </IconButton>
+              ))}
             </Stack>
           </Box>
 
@@ -99,12 +110,13 @@ const Footer = () => {
                   {col.links.map((l) => (
                     <MuiLink
                       key={l.label}
-                      component={Link}
-                      to={l.to}
+                      href={l.to}
+                      onClick={(e) => { e.preventDefault(); go(l.to); }}
                       sx={{
                         color: "text.secondary",
                         textDecoration: "none",
                         fontSize: "0.875rem",
+                        cursor: "pointer",
                         transition: "color .2s ease",
                         "&:hover": { color: "primary.main" },
                       }}

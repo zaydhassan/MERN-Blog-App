@@ -1,5 +1,5 @@
 import React from "react";
-import { CardMedia, Typography, Box, Chip, Stack } from "@mui/material";
+import { Typography, Box, Chip, Stack } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import moment from "moment";
@@ -7,6 +7,7 @@ import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import GlassCard from "./GlassCard";
 import GradientButton from "./GradientButton";
 import UserAvatar from "./UserAvatar";
+import BlurImage from "./BlurImage";
 
 const BlogCard = ({ id, title, description, image, username, profileImage, time, tags }) => {
   const navigate = useNavigate();
@@ -32,16 +33,10 @@ const BlogCard = ({ id, title, description, image, username, profileImage, time,
         onClick={open}
         sx={{ height: "100%", display: "flex", flexDirection: "column", cursor: "pointer" }}
       >
-        <CardMedia
-          component="img"
-          image={image}
+        <BlurImage
+          src={image}
           alt={cleanTitle}
-          sx={{
-            height: 200,
-            objectFit: "cover",
-            transition: "transform .5s ease",
-            "&:hover": { transform: "scale(1.06)" },
-          }}
+          sx={{ height: 200 }}
         />
 
         <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 1.5, flex: 1 }}>
