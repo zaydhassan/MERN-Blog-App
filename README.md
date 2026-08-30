@@ -67,8 +67,6 @@
 
 - Node.js 18+
 - A running MongoDB instance (local or Atlas)
-- (Optional) A Firebase project for password-reset emails — a built-in
-  fallback config is used if unset, so the app runs out of the box in dev.
 
 ### 1. Install dependencies
 
