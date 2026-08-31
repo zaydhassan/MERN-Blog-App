@@ -180,9 +180,6 @@ db.users.updateOne(
 
 ## 🔐 Security & Architecture
 
-This project was hardened from a typical tutorial codebase into a
-production-shaped application. Notable work:
-
 **Authentication**
 - JWT access tokens (15m, in memory) + refresh tokens (7d, httpOnly +
   `Secure`/`SameSite` cookies, rotated on each refresh).
