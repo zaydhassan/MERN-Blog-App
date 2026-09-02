@@ -37,7 +37,7 @@
 | Backend | Node.js, Express 4 |
 | Database | MongoDB via Mongoose 8 |
 | Auth server | JWT (`jsonwebtoken`), bcryptjs, httpOnly refresh cookies |
-| Security | Helmet, express-rate-limit, express-mongo-sanitize, Zod request validation |
+| Security | Helmet, express-rate-limit, express-mongo-sanitize, Zod validation |
 | Mail | Nodemailer (contact form + newsletter) |
 
 ---
