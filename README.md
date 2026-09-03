@@ -10,7 +10,7 @@
 
 ## ✨ Features
 
-- **Auth & RBAC** — JWT access + rotated httpOnly refresh tokens, three roles
+- **Auth & RBAC** — JWT access + Rotated httpOnly refresh tokens, three roles
   (`Reader`, `Writer`, `Admin`), ownership-scoped mutations, admin-only
   moderation endpoints.
 - **Blogging** — create / edit / delete / publish blogs with drafts, rich-text
