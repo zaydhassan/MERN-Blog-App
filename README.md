@@ -1,4 +1,4 @@
-# Inkwell — Blog Platform 
+# Inkwell — MERN Blog Platform 
 
 > A production-grade, full-stack blogging platform: writers publish, readers
 > engage, and a server-side points/levels system rewards meaningful
